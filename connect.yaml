@@ -1,5 +1,3 @@
-integrationTypes:
-  - Express
 deployAs:
   - name: enabler
     applicationType: assets
@@ -80,6 +78,13 @@ deployAs:
         - key: STORED_PAYMENT_METHODS_INTERFACE_ACCOUNT
           description: The payment method interface account value used in the commerceotools payment methods.
           required: false
+        - key: STRIPE_ENABLE_EXPRESS_CHECKOUT
+          description: Enable Stripe Express Checkout Element (true | false).
+          default: 'true'
+          required: true
+        - key: STRIPE_EXPRESS_CHECKOUT_CONTAINER_ID
+          description: The HTML ID where the Express Checkout Element will be mounted.
+          default: 'stripe-express-checkout-element'
       securedConfiguration:
         - key: CTP_CLIENT_SECRET
           description: commercetools client secret.
