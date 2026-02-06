@@ -49,6 +49,19 @@ export class MockPaymentEnabler implements PaymentEnabler {
   ): Promise<StoredComponentBuilder> {
     return {} as StoredComponentBuilder;
   }
+  async getPaymentMethods(values?: { paymentElementType?: string }): Promise<string[]> {
+  const type = values?.paymentElementType || 'paymentElement';
+
+  if (type === 'expressCheckout') {
+    // This return value is what tells the Merchant Center Express is supported.
+    // 'sample' must match the key in your createExpressBuilder's supportedMethods.
+    return ['sample']; 
+  }
+
+  // Standard payment methods for the 'paymentElement' type
+  return ['card', 'invoice', 'purchaseorder', 'customtestmethod'];
+}
+
 
   async createExpressBuilder(
     _type: string
