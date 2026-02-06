@@ -1,3 +1,5 @@
+paymentIntegrationTypes:
+  - Express
 deployAs:
   - name: enabler
     applicationType: assets
