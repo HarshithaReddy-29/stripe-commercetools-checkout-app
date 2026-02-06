@@ -1,78 +1,75 @@
 import {
-  ExpressAddressData,
-  ExpressComponent,
   ExpressOptions,
-  ExpressShippingOptionData,
   OnComplete,
+  PaymentExpressBuilder,
 } from "../payment-enabler/payment-enabler";
+import { BaseOptions } from "../payment-enabler/payment-enabler-mock";
+import { DefaultExpressComponent } from "./base";
  
-export abstract class DefaultExpressComponent implements ExpressComponent {
-  protected processorUrl: string;
-  protected sessionId: string;
-  protected countryCode: string;
-  protected currencyCode: string;
-  protected expressOptions: ExpressOptions;
-  protected availableShippingMethods: ExpressShippingOptionData[];
-  protected paymentMethodConfig: { [key: string]: string };
-  protected onComplete: OnComplete;
+export class SampleExpressBuilder implements PaymentExpressBuilder {
+  private processorUrl: string;
+  private sessionId: string;
+  private countryCode: string;
+  private currencyCode: string;
+  private paymentMethodConfig: { [key: string]: string };
+  private onComplete: OnComplete;
  
-  constructor(opts: {
-    expressOptions: ExpressOptions;
+  constructor(baseOptions: BaseOptions) {
+    this.processorUrl = baseOptions.processorUrl;
+    this.sessionId = baseOptions.sessionId;
+    this.countryCode = baseOptions.countryCode;
+    this.currencyCode = baseOptions.currencyCode;
+    this.paymentMethodConfig = baseOptions.paymentMethodConfig;
+    this.onComplete = baseOptions.onComplete;
+  }
+ 
+  build(config: ExpressOptions): SampleExpressComponent {
+    const express = new SampleExpressComponent({
+      expressOptions: config,
+      processorUrl: this.processorUrl,
+      sessionId: this.sessionId,
+      countryCode: this.countryCode,
+      currencyCode: this.currencyCode,
+      paymentMethodConfig: this.paymentMethodConfig,
+      onComplete: config.onComplete || this.onComplete,
+    });
+ 
+    express.init();
+    return express;
+  }
+}
+ 
+export class SampleExpressComponent extends DefaultExpressComponent {
+  constructor(opts: { expressOptions: ExpressOptions
     processorUrl: string;
+    paymentMethodConfig: { [key: string]: string };
     sessionId: string;
     countryCode: string;
     currencyCode: string;
-    paymentMethodConfig: { [key: string]: string };
     onComplete: OnComplete;
   }) {
+    super({
+      expressOptions: opts.expressOptions,
+      processorUrl: opts.processorUrl,
+      sessionId: opts.sessionId,
+      countryCode: opts.countryCode,
+      currencyCode: opts.currencyCode,
+      paymentMethodConfig: opts.paymentMethodConfig,
+      onComplete: opts.onComplete,
+    })
     this.expressOptions = opts.expressOptions;
-    this.processorUrl = opts.processorUrl;
-    this.sessionId = opts.sessionId;
-    this.countryCode = opts.countryCode;
-    this.currencyCode = opts.currencyCode;
-    this.paymentMethodConfig = opts.paymentMethodConfig;
-    this.onComplete = opts.onComplete;
   }
  
-  abstract init(): void;
- 
-  abstract mount(selector: string): void;
- 
-  async setShippingAddress(opts: {
-    address: ExpressAddressData;
-  }): Promise<void> {
-    if (this.expressOptions.onShippingAddressSelected) {
-      await this.expressOptions.onShippingAddressSelected(opts);
-      return;
-    }
- 
-    throw new Error("setShippingAddress not implemented");
+  // Initialize PSP sdk in this method.
+  init(): void {
+    // The code below is simply an example of how onPayButtonClick can be used and do not necessarily mean it must be used here.
+    this.expressOptions.onPayButtonClick().then(res => this.setSessionId(res.sessionId)) ;
   }
  
-  async getShippingMethods(opts: {
-    address: ExpressAddressData;
-  }): Promise<ExpressShippingOptionData[]> {
-    if (this.expressOptions.getShippingMethods) {
-      this.availableShippingMethods =
-        await this.expressOptions.getShippingMethods(opts);
-      return this.availableShippingMethods;
-    }
- 
-    throw new Error("getShippingMethods not implemented");
-  }
- 
-  async setShippingMethod(opts: {
-    shippingMethod: { id: string };
-  }): Promise<void> {
-    if (this.expressOptions.onShippingMethodSelected) {
-      await this.expressOptions.onShippingMethodSelected(opts);
-      return;
-    }
- 
-    throw new Error("setShippingMethod not implemented");
-  }
- 
-  protected setSessionId(sessionId): void {
-    this.sessionId = sessionId;
+  // To be called when mounting the component
+  mount(selector: string): void {
+    document
+      .querySelector(selector)
+      .insertAdjacentHTML("afterbegin", `Sample express component with sessionId: ${this.sessionId} mounted.`);
   }
 }
