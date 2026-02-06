@@ -1,4 +1,4 @@
-paymentIntegrationTypes:
+integrationTypes:
   - Express
 deployAs:
   - name: enabler
