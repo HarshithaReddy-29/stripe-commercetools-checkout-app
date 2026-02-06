@@ -1,3 +1,7 @@
+metadata:
+  integrationTypes:
+    - standard
+    - expressCheckout
 deployAs:
   - name: enabler
     applicationType: assets
