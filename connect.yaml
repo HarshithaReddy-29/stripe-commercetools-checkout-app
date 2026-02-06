@@ -1,8 +1,3 @@
-capabilities:
-  payments:
-    methods:
-      - name: stripe
-        express: true
 deployAs:
   - name: enabler
     applicationType: assets
@@ -58,6 +53,15 @@ deployAs:
         - key: STRIPE_SAVED_PAYMENT_METHODS_CONFIG
           description: Stripe configuration for saved payment methods (example - {"payment_method_save":"enabled","payment_method_save_usage":"off_session","payment_method_redisplay":"enabled","payment_method_redisplay_limit":10}).
           default: '{"payment_method_save":"disabled"}'
+        - key: STORED_PAYMENT_METHODS_ENABLED
+          description: If set to "true" then the stored payment methods feature is enabled. Default value is "false".
+          required: false
+        - key: STORED_PAYMENT_METHODS_PAYMENT_INTERFACE
+          description: The payment method payment interface value used in the commerceotools payment methods. Default value is "psp-template".
+          required: false
+        - key: STORED_PAYMENT_METHODS_INTERFACE_ACCOUNT
+          description: The payment method interface account value used in the commerceotools payment methods.
+          required: false
         - key: MERCHANT_RETURN_URL
           description: Merchant return URL
           required: true
