@@ -91,6 +91,7 @@ export interface PaymentEnabler {
    * @param type - Boolean value to indicate if the payment method details should be stored or not.
    */
   setStorePaymentDetails(enabled: boolean): void;
+  getAvailableMethods(): Promise<string[]>;
 }
  
  
