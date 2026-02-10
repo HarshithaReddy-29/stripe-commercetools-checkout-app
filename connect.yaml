@@ -1,12 +1,3 @@
-schemaVersion: v1
-
-connectorType: checkout-payment
-
-capabilities:
-  payments:
-    methods:
-      - name: stripe
-        express: true
 deployAs:
   - name: enabler
     applicationType: assets
