@@ -82,4 +82,23 @@ export class MockPaymentEnabler implements PaymentEnabler {
   setStorePaymentDetails(_enabled: boolean): void {
     // no-op for mock
   }
+  async getAvailableMethods(): Promise<string[]> {
+    const methods: string[] = [];
+
+    // Apple Pay check
+    if (
+      typeof window !== "undefined" &&
+      (window as any).ApplePaySession &&
+      (window as any).ApplePaySession.canMakePayments()
+    ) {
+      methods.push("applepay");
+    }
+
+    // Google Pay / Payment Request API check
+    if (typeof window !== "undefined" && "PaymentRequest" in window) {
+      methods.push("googlepay");
+    }
+
+    return methods;
+  }
 }
