@@ -139,8 +139,12 @@ export class DropinComponents implements DropinComponent {
     const returnUrl = new URL(merchantReturnUrl);
     returnUrl.searchParams.append("cartId", cartId);
     returnUrl.searchParams.append("paymentReference", paymentReference);
+if (!("confirmPayment" in this.baseOptions.sdk)) {
+  throw new Error("Stripe SDK not available");
+}
 
-    const { error, paymentIntent } = await this.baseOptions.sdk.confirmPayment({
+const { error, paymentIntent } = await this.baseOptions.sdk.confirmPayment({
+
       elements: this.baseOptions.elements,
       clientSecret,
       confirmParams: {

@@ -9,13 +9,24 @@ import {
   StoredPaymentMethod,
   CocoStoredPaymentMethod
 } from './payment-enabler';
+import type {
+  Stripe,
+  StripeElements,
+  StripePaymentElement,
+} from '@stripe/stripe-js';
 import { FakeSdk } from "../fake-sdk";
 export type StoredPaymentMethodsConfig = {
   isEnabled: boolean;
   storedPaymentMethods: CocoStoredPaymentMethod[];
 };
 export type BaseOptions = {
-  sdk: FakeSdk;
+  /** Stripe SDK OR Fake SDK (depending on flow) */
+  sdk: Stripe | FakeSdk;
+
+  /** ONLY for embedded / payment element flow */
+  elements?: StripeElements;
+  paymentElement?: StripePaymentElement;
+
   processorUrl: string;
   countryCode?: string;
   currencyCode?: string;
@@ -23,8 +34,10 @@ export type BaseOptions = {
   environment: string;
   paymentMethodConfig?: { [key: string]: string };
   locale?: string;
+
   onComplete: (result: PaymentResult) => void;
   onError: (error: any, context?: { paymentReference?: string }) => void;
+
   storedPaymentMethodsConfig: StoredPaymentMethodsConfig;
   getStorePaymentDetails: () => boolean;
   setStorePaymentDetails: (enabled: boolean) => void;
