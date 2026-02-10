@@ -9,13 +9,24 @@ import {
   StoredPaymentMethod,
   CocoStoredPaymentMethod
 } from './payment-enabler';
+import type {
+  Stripe,
+  StripeElements,
+  StripePaymentElement,
+} from '@stripe/stripe-js';
 import { FakeSdk } from "../fake-sdk";
 export type StoredPaymentMethodsConfig = {
   isEnabled: boolean;
   storedPaymentMethods: CocoStoredPaymentMethod[];
 };
 export type BaseOptions = {
-  sdk: FakeSdk;
+  /** Stripe SDK OR Fake SDK (depending on flow) */
+  sdk: Stripe | FakeSdk;
+
+  /** ONLY for embedded / payment element flow */
+  elements?: StripeElements;
+  paymentElement?: StripePaymentElement;
+
   processorUrl: string;
   countryCode?: string;
   currencyCode?: string;
@@ -23,8 +34,10 @@ export type BaseOptions = {
   environment: string;
   paymentMethodConfig?: { [key: string]: string };
   locale?: string;
+
   onComplete: (result: PaymentResult) => void;
   onError: (error: any, context?: { paymentReference?: string }) => void;
+
   storedPaymentMethodsConfig: StoredPaymentMethodsConfig;
   getStorePaymentDetails: () => boolean;
   setStorePaymentDetails: (enabled: boolean) => void;
@@ -49,19 +62,6 @@ export class MockPaymentEnabler implements PaymentEnabler {
   ): Promise<StoredComponentBuilder> {
     return {} as StoredComponentBuilder;
   }
-  async getPaymentMethods(values?: { paymentElementType?: string }): Promise<string[]> {
-  const type = values?.paymentElementType || 'paymentElement';
-
-  if (type === 'expressCheckout') {
-    // This return value is what tells the Merchant Center Express is supported.
-    // 'sample' must match the key in your createExpressBuilder's supportedMethods.
-    return ['sample']; 
-  }
-
-  // Standard payment methods for the 'paymentElement' type
-  return ['card', 'invoice', 'purchaseorder', 'customtestmethod'];
-}
-
 
   async createExpressBuilder(
     _type: string
