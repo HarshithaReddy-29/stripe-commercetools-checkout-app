@@ -44,6 +44,9 @@ export type BaseOptions = {
   setSessionId?: (sessionId: string) => void;
 };
 export class MockPaymentEnabler implements PaymentEnabler {
+  getAvailableMethods(): Promise<string[]> {
+    throw new Error('Method not implemented.');
+  }
 
   async createComponentBuilder(
     _type: string

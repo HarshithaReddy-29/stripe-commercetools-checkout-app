@@ -44,3 +44,33 @@ export abstract class BaseComponent implements PaymentComponent {
   };
   isAvailable?(): Promise<boolean>;
 }
+export class DefaultExpressComponent extends BaseComponent {
+  constructor(
+    paymentMethod: PaymentMethod,
+    baseOptions: BaseOptions,
+    componentOptions: ComponentOptions
+  ) {
+    super(paymentMethod, baseOptions, componentOptions);
+  }
+
+  mount(selector: string): void {
+    const el = document.querySelector(selector);
+    if (!el) throw new Error(`Express mount point not found: ${selector}`);
+
+    // For now: placeholder UI. Later you can mount Stripe Express Checkout element here.
+    el.innerHTML = `
+      <div style="padding:12px;border:1px dashed #999">
+        Express checkout placeholder (Stripe)
+      </div>
+    `;
+  }
+
+  submit(): void {
+    // Express flows often auto-submit (ApplePay/GPay). Keep as no-op for now.
+  }
+
+  async isAvailable(): Promise<boolean> {
+    return true;
+  }
+}
+

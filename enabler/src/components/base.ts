@@ -44,3 +44,4 @@ export abstract class BaseComponent implements PaymentComponent {
   };
   isAvailable?(): Promise<boolean>;
 }
+// ---- Concrete Express component (exported) ----
