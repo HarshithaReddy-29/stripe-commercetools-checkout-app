@@ -27,6 +27,11 @@
 *          paymentElement.mount('#invoice-component')
 *      })
 */
+declare global {
+  interface Window {
+    ApplePaySession?: any;
+  }
+}
 export interface PaymentEnabler {
   /**
    * Creates a payment component builder of the specified type.
@@ -91,7 +96,9 @@ export interface PaymentEnabler {
    * @param type - Boolean value to indicate if the payment method details should be stored or not.
    */
   setStorePaymentDetails(enabled: boolean): void;
+   getAvailableMethods(): Promise<string[]>;
 }
+
  
  
 /**
