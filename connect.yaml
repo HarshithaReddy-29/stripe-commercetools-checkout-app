@@ -4,10 +4,6 @@ deployAs:
   - name: processor
     applicationType: service
     endpoint: /
-    checkout:
-      expressPayments:
-        supported: true
-
     scripts:
       postDeploy: npm install && npm run connector:post-deploy
       preUndeploy: npm install && npm run connector:pre-undeploy
