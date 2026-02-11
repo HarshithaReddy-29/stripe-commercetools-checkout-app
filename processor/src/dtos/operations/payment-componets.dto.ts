@@ -8,6 +8,11 @@ const DropinType = Type.Enum({
 export const SupportedPaymentDropinsData = Type.Object({
   type: DropinType,
 });
+export const SupportedPaymentExpressData = Type.Object({
+  type: Type.Enum({
+    DROPIN: 'dropin',
+  }),
+});
 
 export const SupportedPaymentComponentsData = Type.Object({
   type: Type.String(),
@@ -37,6 +42,7 @@ export const SupportedPaymentComponentsData = Type.Object({
 export const SupportedPaymentComponentsSchema = Type.Object({
   dropins: Type.Array(SupportedPaymentDropinsData),
   components: Type.Array(SupportedPaymentComponentsData),
+  express: Type.Optional(Type.Array(SupportedPaymentExpressData)),
 });
 
 export enum PaymentComponentsSupported {
