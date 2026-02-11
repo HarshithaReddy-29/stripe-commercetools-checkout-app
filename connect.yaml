@@ -5,8 +5,8 @@ deployAs:
     applicationType: service
     endpoint: /
     checkout:
-    expressPayments:
-    supported: true
+      expressPayments:
+        supported: true
 
     scripts:
       postDeploy: npm install && npm run connector:post-deploy
