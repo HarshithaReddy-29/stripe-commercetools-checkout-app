@@ -154,7 +154,7 @@ export class StripePaymentService extends AbstractPaymentService {
     return {
       dropins: [{ type: 'embedded' }],
       components: [],
-      express: [{ type: 'dropin' }],
+      express: [{ type: 'apple pay' }],
     };
   }
 
