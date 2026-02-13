@@ -12,6 +12,7 @@ export const SupportedPaymentExpressData = Type.Object({
   type: Type.Enum({
     DROPIN: 'dropin',
     APPLEPAY: 'apple pay',
+    GOOGLEPAY: 'google pay',
   }),
 });
 
