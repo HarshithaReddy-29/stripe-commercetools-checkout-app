@@ -9,9 +9,6 @@ deployAs:
       preUndeploy: npm install && npm run connector:pre-undeploy
     configuration:
       standardConfiguration:
-        - key: CTP_PROJECT_KEY
-          description: commercetools project key
-          required: true
         - key: CTP_AUTH_URL
           description: commercetools Auth URL (example - https://auth.europe-west1.gcp.commercetools.com).
           required: true
