@@ -1,6 +1,6 @@
 import {
   PaymentEnabler,
-  PaymentComponentBuilder,
+  //PaymentComponentBuilder,
   PaymentDropinBuilder,
   StoredComponentBuilder,
   PaymentExpressBuilder,
@@ -48,11 +48,11 @@ export class MockPaymentEnabler implements PaymentEnabler {
     throw new Error('Method not implemented.');
   }
 
-  async createComponentBuilder(
+  /*async createComponentBuilder(
     _type: string
   ): Promise<PaymentComponentBuilder> {
     return {} as PaymentComponentBuilder;
-  }
+  }*/
 
   async createDropinBuilder(
     _type: DropinType

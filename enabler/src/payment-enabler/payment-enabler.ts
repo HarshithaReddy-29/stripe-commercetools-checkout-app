@@ -39,7 +39,7 @@ export interface PaymentEnabler {
    * @returns A promise that resolves to the payment component builder.
    * @throws {Error} If the payment component builder cannot be created.
    */
-  createComponentBuilder: (
+ /* createComponentBuilder: (
     type: string
   ) => Promise<PaymentComponentBuilder | never>;
  
