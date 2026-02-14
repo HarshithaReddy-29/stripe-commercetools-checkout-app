@@ -1,3 +1,4 @@
+import type { Appearance, LayoutObject } from "@stripe/stripe-js";
 /**
 * Represents the payment enabler. The payment enabler is the entry point for creating the components.
 *
@@ -27,6 +28,48 @@
 *          paymentElement.mount('#invoice-component')
 *      })
 */
+export interface StripeElementsConfig {
+  /**
+   * Customizes the appearance of the Payment Element or Express Checkout.
+   * If provided, overrides the backend configuration (STRIPE_APPEARANCE_PAYMENT_ELEMENT).
+   * @see https://stripe.com/docs/elements/appearance-api
+   * @example
+   * ```typescript
+   * appearance: {
+   *   theme: 'night',
+   *   variables: {
+   *     colorPrimary: '#7c3aed',
+   *     borderRadius: '12px',
+   *   }
+   * }
+   * ```
+   */
+  appearance?: Appearance;
+  /**
+   * Configures the layout of the Payment Element.
+   * If provided, overrides the backend configuration (STRIPE_LAYOUT).
+   * @see https://stripe.com/docs/payments/payment-element#layout
+   * @example
+   * ```typescript
+   * layout: {
+   *   type: 'accordion',
+   *   defaultCollapsed: false,
+   *   radios: true,
+   * }
+   * ```
+   */
+  layout?: LayoutObject;
+  /**
+   * Controls how billing address is collected in the Payment Element.
+   * If provided, overrides the backend configuration (STRIPE_COLLECT_BILLING_ADDRESS).
+   * - 'auto': Stripe decides based on the payment method
+   * - 'never': Never show address fields (you provide the address)
+   * - 'if_required': Show address fields only if required by the payment method
+   * @default 'auto'
+   */
+  collectBillingAddress?: 'auto' | 'never' | 'if_required';
+}
+
 declare global {
   interface Window {
     ApplePaySession?: any;
@@ -200,6 +243,15 @@ export type EnablerOptions = {
    * @param error - The error that occurred.
    */
   onError?: (error: any) => void;
+    /**
+   * Represents the type of payment element to be created, could be 'paymentElement|expressCheckout'.
+   * This variable should be a string value that defines the type of payment element being used in the application.
+   */
+  paymentElementType?: string;
+  /**
+   * The Stripe customer ID.
+   */
+  stripeCustomerId?: string;
 };
  
 /**
