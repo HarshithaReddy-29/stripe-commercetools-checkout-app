@@ -15,6 +15,7 @@ import type {
   StripePaymentElement,
 } from '@stripe/stripe-js';
 import { FakeSdk } from "../fake-sdk";
+import { SampleExpressBuilder } from '../express/sample';
 export type StoredPaymentMethodsConfig = {
   isEnabled: boolean;
   storedPaymentMethods: CocoStoredPaymentMethod[];
@@ -44,6 +45,7 @@ export type BaseOptions = {
   setSessionId?: (sessionId: string) => void;
 };
 export class MockPaymentEnabler implements PaymentEnabler {
+  setupData: { baseOptions: any; } | PromiseLike<{ baseOptions: any; }>;
   getAvailableMethods(): Promise<string[]> {
     throw new Error('Method not implemented.');
   }
@@ -66,11 +68,21 @@ export class MockPaymentEnabler implements PaymentEnabler {
     return {} as StoredComponentBuilder;
   }
 
-  async createExpressBuilder(
-    _type: string
-  ): Promise<PaymentExpressBuilder> {
-    return {} as PaymentExpressBuilder;
+async createExpressBuilder(type: string): Promise<PaymentExpressBuilder> {
+  const { baseOptions } = await this.setupData;
+
+  const supportedMethods: Record<string, new (opts: any) => PaymentExpressBuilder> = {
+    sample: SampleExpressBuilder, // <-- your express builder class
+  };
+
+  if (!supportedMethods[type]) {
+    throw new Error(
+      `Express checkout type not supported: ${type}. Supported: ${Object.keys(supportedMethods).join(', ')}`
+    );
   }
+
+  return new supportedMethods[type](baseOptions);
+}
 
   async isStoredPaymentMethodsEnabled(): Promise<boolean> {
     return false;
