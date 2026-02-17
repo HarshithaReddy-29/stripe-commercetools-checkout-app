@@ -1,16 +1,16 @@
-const projectKey = __VITE_CTP_PROJECT_KEY__;
+const projectKey = CTP_PROJECT_KEY;
 
 const fetchAdminToken = async () => {
   const myHeaders = new Headers();
 
-  myHeaders.append('Authorization', `Basic ${btoa(`${__VITE_CTP_CLIENT_ID__}:${__VITE_CTP_CLIENT_SECRET__}`)}`);
+  myHeaders.append('Authorization', `Basic ${btoa(`${CTP_CLIENT_ID}:${CTP_CLIENT_SECRET}`)}`);
   myHeaders.append('Content-Type', 'application/x-www-form-urlencoded');
 
   var urlencoded = new URLSearchParams();
   urlencoded.append('grant_type', 'client_credentials');
   //urlencoded.append('scope', __VITE_ADMIN_SCOPE__);
 
-  const response = await fetch(`${__VITE_CTP_AUTH_URL__}/oauth/token`, {
+  const response = await fetch(`${CTP_AUTH_URL}/oauth/token`, {
     body: urlencoded,
     headers: myHeaders,
     method: 'POST',
@@ -30,11 +30,11 @@ const getSessionId = async(cartId) => {
   const accessToken = await fetchAdminToken();
 
   const sessionMetadata = {
-    processorUrl: __VITE_PROCESSOR_URL__,
+    processorUrl: CTP_PROCESSOR_URL,
     allowedPaymentMethods: ["card", "invoice", "purchaseorder", "dropin","applepay","googlepay"], // add here your allowed methods for development purposes
   };
 
-  const url = `${__VITE_CTP_SESSION_URL__}/${projectKey}/sessions`
+  const url = `${CTP_SESSION_URL}/${projectKey}/sessions`
 
   const res = await fetch(url, {
     method: 'POST',

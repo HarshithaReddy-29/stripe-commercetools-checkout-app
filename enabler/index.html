@@ -10,13 +10,13 @@
   <script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
   <script>
-    var __VITE_CTP_AUTH_URL__ = !'%VITE_CTP_AUTH_URL%'.startsWith('%') && '%VITE_CTP_AUTH_URL%';
-    var __VITE_CTP_API_URL__ = !'%VITE_CTP_API_URL%'.startsWith('%') && '%VITE_CTP_API_URL%';
-    var __VITE_CTP_SESSION_URL__ = !'%VITE_CTP_SESSION_URL%'.startsWith('%') && '%VITE_CTP_SESSION_URL%';
-    var __VITE_CTP_CLIENT_ID__ = !'%VITE_CTP_CLIENT_ID%'.startsWith('%') && '%VITE_CTP_CLIENT_ID%';
-    var __VITE_CTP_CLIENT_SECRET__ = !'%VITE_CTP_CLIENT_SECRET%'.startsWith('%') && '%VITE_CTP_CLIENT_SECRET%';
-    var __VITE_CTP_PROJECT_KEY__ = !'%VITE_CTP_PROJECT_KEY%'.startsWith('%') && '%VITE_CTP_PROJECT_KEY%';
-    var __VITE_PROCESSOR_URL__ = !'%VITE_PROCESSOR_URL%'.startsWith('%') && '%VITE_PROCESSOR_URL%';
+    var CTP_AUTH_URL = !'%CTP_AUTH_URL%'.startsWith('%') && '%CTP_AUTH_URL%';
+    var CTP_API_URL = !'%CTP_API_URL%'.startsWith('%') && '%CTP_API_URL%';
+    var CTP_SESSION_URL = !'%CTP_SESSION_URL%'.startsWith('%') && '%CTP_SESSION_URL%';
+    var CTP_CLIENT_ID__ = !'%CTP_CLIENT_ID%'.startsWith('%') && '%CTP_CLIENT_ID%';
+    var CTP_CLIENT_SECRET__ = !'%CTP_CLIENT_SECRET%'.startsWith('%') && '%CTP_CLIENT_SECRET%';
+    var CTP_PROJECT_KEY__ = !'%CTP_PROJECT_KEY%'.startsWith('%') && '%CTP_PROJECT_KEY%';
+    var CTP_PROCESSOR_URL__ = !'%ctp_PROCESSOR_URL%'.startsWith('%') && '%CTP_PROCESSOR_URL%';
   </script>
   <script src="../dev-utils/session.js"></script>
 </head>
@@ -119,7 +119,7 @@
             const isDropin = selectedText.startsWith('dropin');
 
             const enabler = new Enabler({
-              processorUrl: __VITE_PROCESSOR_URL__,
+              processorUrl: CTP_PROCESSOR_URL,
               sessionId: sessionId,
               currency: "EUR",
               onComplete: ({ isSuccess, paymentReference }) => {
