@@ -31,7 +31,11 @@ export type BaseOptions = {
   currencyCode?: string;
   sessionId: string;
   environment: string;
-  paymentMethodConfig?: { [key: string]: string };
+  paymentMethodConfig?: {
+    [key: string]: {
+      isEnabled: boolean;
+    };
+  };
   locale?: string;
   onComplete: (result: PaymentResult) => void;
   onError: (error: any, context?: { paymentReference?: string }) => void;
@@ -106,8 +110,16 @@ export class MockPaymentEnabler implements PaymentEnabler {
         processorUrl: options.processorUrl,
         sessionId: options.sessionId,
         environment: sdkOptions.environment,
-        onComplete: options.onComplete || (() => {}),
-        onError: options.onError || (() => {}),
+        onComplete: options.onComplete || (() => { }),
+        onError: options.onError || (() => { }),
+        paymentMethodConfig: {
+          applepay: {
+            isEnabled: true,
+          },
+          googlepay: {
+            isEnabled: true,
+          },
+        },
         storedPaymentMethodsConfig: {
           isEnabled: configJson.storedPaymentMethodsConfig.isEnabled,
           storedPaymentMethods: storedPaymentMethodsList,

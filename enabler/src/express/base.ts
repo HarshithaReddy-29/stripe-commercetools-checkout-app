@@ -5,7 +5,7 @@ import {
   ExpressShippingOptionData,
   OnComplete,
 } from "../payment-enabler/payment-enabler";
- 
+
 export abstract class DefaultExpressComponent implements ExpressComponent {
   protected processorUrl: string;
   protected sessionId: string;
@@ -13,16 +13,24 @@ export abstract class DefaultExpressComponent implements ExpressComponent {
   protected currencyCode: string;
   protected expressOptions: ExpressOptions;
   protected availableShippingMethods: ExpressShippingOptionData[];
-  protected paymentMethodConfig: { [key: string]: string };
+  protected paymentMethodConfig: {
+    [key: string]: {
+      isEnabled: boolean;
+    };
+  };
   protected onComplete: OnComplete;
- 
+
   constructor(opts: {
     expressOptions: ExpressOptions;
     processorUrl: string;
     sessionId: string;
     countryCode: string;
     currencyCode: string;
-    paymentMethodConfig: { [key: string]: string };
+    paymentMethodConfig: {
+      [key: string]: {
+        isEnabled: boolean;
+      };
+    };
     onComplete: OnComplete;
   }) {
     this.expressOptions = opts.expressOptions;
@@ -33,11 +41,11 @@ export abstract class DefaultExpressComponent implements ExpressComponent {
     this.paymentMethodConfig = opts.paymentMethodConfig;
     this.onComplete = opts.onComplete;
   }
- 
+
   abstract init(): void;
- 
+
   abstract mount(selector: string): void;
- 
+
   async setShippingAddress(opts: {
     address: ExpressAddressData;
   }): Promise<void> {
@@ -45,10 +53,10 @@ export abstract class DefaultExpressComponent implements ExpressComponent {
       await this.expressOptions.onShippingAddressSelected(opts);
       return;
     }
- 
+
     throw new Error("setShippingAddress not implemented");
   }
- 
+
   async getShippingMethods(opts: {
     address: ExpressAddressData;
   }): Promise<ExpressShippingOptionData[]> {
@@ -57,10 +65,10 @@ export abstract class DefaultExpressComponent implements ExpressComponent {
         await this.expressOptions.getShippingMethods(opts);
       return this.availableShippingMethods;
     }
- 
+
     throw new Error("getShippingMethods not implemented");
   }
- 
+
   async setShippingMethod(opts: {
     shippingMethod: { id: string };
   }): Promise<void> {
@@ -68,10 +76,10 @@ export abstract class DefaultExpressComponent implements ExpressComponent {
       await this.expressOptions.onShippingMethodSelected(opts);
       return;
     }
- 
+
     throw new Error("setShippingMethod not implemented");
   }
- 
+
   protected setSessionId(sessionId): void {
     this.sessionId = sessionId;
   }
