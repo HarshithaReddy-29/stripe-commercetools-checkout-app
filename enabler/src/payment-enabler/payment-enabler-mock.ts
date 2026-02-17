@@ -214,7 +214,8 @@ export class MockPaymentEnabler implements PaymentEnabler {
     const { baseOptions } = await this.setupData;
 
     const supportedMethods = {
-      sample: SampleExpressBuilder,
+      applepay: SampleExpressBuilder,
+      googlepay: SampleExpressBuilder,
     };
 
     if (!Object.keys(supportedMethods).includes(type)) {
