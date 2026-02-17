@@ -141,6 +141,13 @@ export interface PaymentEnabler {
   setStorePaymentDetails(enabled: boolean): void;
    getAvailableMethods(): Promise<string[]>;
 }
+export type PaymentComponentState = {
+  card?: {
+    endDigits?: string;
+    brand?: string;
+    expiryDate?: string;
+  };
+};
 
  
  
@@ -153,35 +160,33 @@ export interface PaymentComponent {
    * Mounts the payment component to the specified selector.
    * @param selector - The selector where the component will be mounted.
    */
-  mount(selector: string): void;
+  mount(selector: string): Promise<void>;
  
   /**
    * Submits the payment.
    */
-  submit(): void;
+  submit({
+    storePaymentDetails,
+  }: {
+    storePaymentDetails?: boolean;
+  }): Promise<void>;
  
   /**
    * Shows the validation for the payment component.
    */
-  showValidation?(): void;
+  showValidation?(): Promise<void>;
  
   /**
    * Checks if the payment component is valid.
    * @returns A boolean indicating whether the payment component is valid.
    */
-  isValid?(): boolean;
+  isValid?(): Promise<boolean>;
  
   /**
    * Gets the state of the payment component.
    * @returns An object representing the state of the payment component.
    */
-  getState?(): {
-    card?: {
-      endDigits?: string;
-      brand?: string;
-      expiryDate?: string;
-    };
-  };
+  getState?(): Promise<PaymentComponentState>;
  
   /**
    * Checks if the payment component is available for use.
@@ -285,6 +290,7 @@ export enum PaymentMethod {
   /* TWINT */
   twint = "twint",
   dropin = "dropin",
+  customtestmethod = "customtestmethod",
 }
  
 /**
@@ -322,7 +328,7 @@ export type ComponentOptions = {
    * A callback function that is called when the pay button is clicked.
    * @returns A Promise indicating whether the payment should proceed.
    */
-  onPayButtonClick?: () => Promise<void>;
+  onPayButtonClick?: () => Promise<{ storePaymentDetails?: boolean }>;
 };
 export interface StoredComponent {
   submit(): Promise<void>;

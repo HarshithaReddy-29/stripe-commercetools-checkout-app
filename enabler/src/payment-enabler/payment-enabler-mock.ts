@@ -1,33 +1,31 @@
-import {
-  PaymentEnabler,
-  //PaymentComponentBuilder,
-  PaymentDropinBuilder,
-  StoredComponentBuilder,
-  PaymentExpressBuilder,
-  DropinType,
-  PaymentResult,
-  StoredPaymentMethod,
-  CocoStoredPaymentMethod
-} from './payment-enabler';
-import type {
-  Stripe,
-  StripeElements,
-  StripePaymentElement,
-} from '@stripe/stripe-js';
+import { CardBuilder } from "../components/payment-methods/card/card";
+import { InvoiceBuilder } from "../components/payment-methods/invoice/invoice";
+import { PurchaseOrderBuilder } from "../components/payment-methods/purchase-order/purchase-order";
 import { FakeSdk } from "../fake-sdk";
-import { SampleExpressBuilder } from '../express/sample';
+import {
+  CocoStoredPaymentMethod,
+  DropinType,
+  EnablerOptions,
+  PaymentComponentBuilder,
+  PaymentDropinBuilder,
+  PaymentEnabler,
+  PaymentExpressBuilder,
+  PaymentResult,
+  StoredComponentBuilder,
+} from "./payment-enabler";
+import { DropinEmbeddedBuilder } from "../dropin/dropin-embedded";
+import { CustomTestMethodBuilder } from "../components/payment-methods/custom-test-method/custom-test-method";
+import { StoredCardBuilder } from "../stored/stored-payment-methods/card";
+import { SampleExpressBuilder } from "../express/sample";
+
+
 export type StoredPaymentMethodsConfig = {
   isEnabled: boolean;
   storedPaymentMethods: CocoStoredPaymentMethod[];
 };
+
 export type BaseOptions = {
-  /** Stripe SDK OR Fake SDK (depending on flow) */
-  sdk: Stripe | FakeSdk;
-
-  /** ONLY for embedded / payment element flow */
-  elements?: StripeElements;
-  paymentElement?: StripePaymentElement;
-
+  sdk: FakeSdk;
   processorUrl: string;
   countryCode?: string;
   currencyCode?: string;
@@ -35,66 +33,198 @@ export type BaseOptions = {
   environment: string;
   paymentMethodConfig?: { [key: string]: string };
   locale?: string;
-
   onComplete: (result: PaymentResult) => void;
   onError: (error: any, context?: { paymentReference?: string }) => void;
-
   storedPaymentMethodsConfig: StoredPaymentMethodsConfig;
   getStorePaymentDetails: () => boolean;
   setStorePaymentDetails: (enabled: boolean) => void;
   setSessionId?: (sessionId: string) => void;
 };
+
 export class MockPaymentEnabler implements PaymentEnabler {
-  setupData: { baseOptions: any; } | PromiseLike<{ baseOptions: any; }>;
+  setupData: Promise<{ baseOptions: BaseOptions }>;
+  private storePaymentDetails = false;
+
+  constructor(options: EnablerOptions) {
+    this.setupData = MockPaymentEnabler._Setup(
+      options,
+      this.getStorePaymentDetails,
+      this.setStorePaymentDetails,
+    );
+  }
   getAvailableMethods(): Promise<string[]> {
-    throw new Error('Method not implemented.');
+    throw new Error("Method not implemented.");
   }
 
-  /*async createComponentBuilder(
-    _type: string
-  ): Promise<PaymentComponentBuilder> {
-    return {} as PaymentComponentBuilder;
-  }*/
+  private static _Setup = async (
+    options: EnablerOptions,
+    getStorePaymentDetails: () => boolean,
+    setStorePaymentDetails: (enabled: boolean) => void,
+  ): Promise<{ baseOptions: BaseOptions }> => {
+    // Fetch SDK config from processor
+    const configResponse = await fetch(
+      options.processorUrl + "/operations/config",
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Id": options.sessionId,
+        },
+      },
+    );
 
-  async createDropinBuilder(
-    _type: DropinType
-  ): Promise<PaymentDropinBuilder> {
-    return {} as PaymentDropinBuilder;
+    const configJson = await configResponse.json();
+
+    let storedPaymentMethodsList: CocoStoredPaymentMethod[] = [];
+    if (configJson.storedPaymentMethodsConfig.isEnabled === true) {
+      const response = await fetch(
+        options.processorUrl + "/stored-payment-methods",
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Session-Id": options.sessionId,
+          },
+        },
+      );
+
+      const storedPaymentMethods: {
+        storedPaymentMethods: CocoStoredPaymentMethod[];
+      } = await response.json();
+
+      storedPaymentMethodsList = storedPaymentMethods.storedPaymentMethods;
+    }
+
+    const sdkOptions = {
+      // environment: configJson.environment,
+      environment: "test",
+    };
+
+    return Promise.resolve({
+      baseOptions: {
+        sdk: new FakeSdk(sdkOptions),
+        processorUrl: options.processorUrl,
+        sessionId: options.sessionId,
+        environment: sdkOptions.environment,
+        onComplete: options.onComplete || (() => {}),
+        onError: options.onError || (() => {}),
+        storedPaymentMethodsConfig: {
+          isEnabled: configJson.storedPaymentMethodsConfig.isEnabled,
+          storedPaymentMethods: storedPaymentMethodsList,
+        },
+        setStorePaymentDetails,
+        getStorePaymentDetails,
+      },
+    });
+  };
+
+  async getStoredPaymentMethods({ allowedMethodTypes }) {
+    const setupData = await this.setupData;
+
+    const storedPaymentMethods =
+      setupData.baseOptions.storedPaymentMethodsConfig.storedPaymentMethods
+        .map(({ token, ...storedPaymentMethod }) => storedPaymentMethod)
+        .filter((method) => allowedMethodTypes.includes(method.type));
+
+    return { storedPaymentMethods };
+  }
+
+  async isStoredPaymentMethodsEnabled(): Promise<boolean> {
+    const setupData = await this.setupData;
+    return setupData.baseOptions.storedPaymentMethodsConfig.isEnabled;
+  }
+
+  setStorePaymentDetails = (enabled: boolean): void => {
+    this.storePaymentDetails = enabled;
+  };
+
+  getStorePaymentDetails = (): boolean => {
+    return this.storePaymentDetails;
+  };
+
+  async createComponentBuilder(
+    type: string,
+  ): Promise<PaymentComponentBuilder | never> {
+    const { baseOptions } = await this.setupData;
+
+    const supportedMethods = {
+      card: CardBuilder,
+      invoice: InvoiceBuilder,
+      purchaseorder: PurchaseOrderBuilder,
+      customtestmethod: CustomTestMethodBuilder,
+    };
+
+    if (!Object.keys(supportedMethods).includes(type)) {
+      throw new Error(
+        `Component type not supported: ${type}. Supported types: ${Object.keys(
+          supportedMethods,
+        ).join(", ")}`,
+      );
+    }
+
+    return new supportedMethods[type](baseOptions);
   }
 
   async createStoredPaymentMethodBuilder(
-    _type: string
-  ): Promise<StoredComponentBuilder> {
-    return {} as StoredComponentBuilder;
+    type: string,
+  ): Promise<StoredComponentBuilder | never> {
+    const setupData = await this.setupData;
+
+    if (!setupData.baseOptions.storedPaymentMethodsConfig.isEnabled) {
+      throw new Error(
+        "Stored payment methods is not enabled and thus cannot be used to build a new component",
+      );
+    }
+
+    const supportedMethods = {
+      card: StoredCardBuilder,
+    };
+
+    if (!Object.keys(supportedMethods).includes(type)) {
+      throw new Error(
+        `Component type not supported: ${type}. Supported types: ${Object.keys(supportedMethods).join(", ")}`,
+      );
+    }
+
+    return new supportedMethods[type](setupData.baseOptions);
   }
 
-async createExpressBuilder(type: string): Promise<PaymentExpressBuilder> {
-  const { baseOptions } = await this.setupData;
+  async createDropinBuilder(
+    type: DropinType,
+  ): Promise<PaymentDropinBuilder | never> {
+    const { baseOptions } = await this.setupData;
 
-  const supportedMethods: Record<string, new (opts: any) => PaymentExpressBuilder> = {
-    sample: SampleExpressBuilder, // <-- your express builder class
-  };
+    const supportedMethods = {
+      embedded: DropinEmbeddedBuilder,
+      // hpp: DropinHppBuilder,
+    };
 
-  if (!supportedMethods[type]) {
-    throw new Error(
-      `Express checkout type not supported: ${type}. Supported: ${Object.keys(supportedMethods).join(', ')}`
-    );
+    if (!Object.keys(supportedMethods).includes(type)) {
+      throw new Error(
+        `Component type not supported: ${type}. Supported types: ${Object.keys(
+          supportedMethods,
+        ).join(", ")}`,
+      );
+    }
+
+    return new supportedMethods[type](baseOptions);
   }
 
-  return new supportedMethods[type](baseOptions);
-}
+  async createExpressBuilder(type: string): Promise<PaymentExpressBuilder | never> {
+    const { baseOptions } = await this.setupData;
 
-  async isStoredPaymentMethodsEnabled(): Promise<boolean> {
-    return false;
-  }
+    const supportedMethods = {
+      sample: SampleExpressBuilder,
+    };
 
-  async getStoredPaymentMethods(_: {
-    allowedMethodTypes: string[];
-  }): Promise<{ storedPaymentMethods?: StoredPaymentMethod[] }> {
-    return {};
-  }
+    if (!Object.keys(supportedMethods).includes(type)) {
+      throw new Error(
+        `Express checkout type not supported: ${type}. Supported types: ${Object.keys(
+          supportedMethods
+        ).join(", ")}`
+      );
+    }
 
-  setStorePaymentDetails(_enabled: boolean): void {
-    // no-op for mock
+    return new supportedMethods[type](baseOptions);
   }
 }

@@ -12,6 +12,8 @@ export const PaymentRequestSchema = Type.Object({
     type: Type.String(),
     poNumber: Type.Optional(Type.String()),
     invoiceMemo: Type.Optional(Type.String()),
+    storedPaymentMethodId: Type.Optional(Type.String()),
+    storePaymentMethod: Type.Optional(Type.Boolean()),
   }),
   paymentOutcome: PaymentOutcomeSchema,
 });
