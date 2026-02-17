@@ -30,7 +30,7 @@ const getSessionId = async(cartId) => {
   const accessToken = await fetchAdminToken();
 
   const sessionMetadata = {
-    processorUrl: CTP_PROCESSOR_URL,
+    processorUrl: process.env.CTP_PROCESSOR_URL,
     allowedPaymentMethods: ["card", "invoice", "purchaseorder", "dropin","applepay","googlepay"], // add here your allowed methods for development purposes
   };
 
