@@ -18,14 +18,19 @@ export class SampleExpressBuilder implements PaymentExpressBuilder {
   };
   private onComplete: OnComplete;
 
-  constructor(baseOptions: BaseOptions) {
-    this.processorUrl = baseOptions.processorUrl;
-    this.sessionId = baseOptions.sessionId;
-    this.countryCode = baseOptions.countryCode;
-    this.currencyCode = baseOptions.currencyCode;
-    this.paymentMethodConfig = baseOptions.paymentMethodConfig ?? {};
-    this.onComplete = baseOptions.onComplete;
+constructor(baseOptions: BaseOptions) {
+  this.processorUrl = baseOptions.processorUrl;
+  this.sessionId = baseOptions.sessionId;
+  this.countryCode = baseOptions.countryCode;
+  this.currencyCode = baseOptions.currencyCode;
+
+  if (!baseOptions.paymentMethodConfig) {
+    throw new Error("paymentMethodConfig missing in BaseOptions");
   }
+  this.paymentMethodConfig = baseOptions.paymentMethodConfig;
+
+  this.onComplete = baseOptions.onComplete;
+}
 
   build(config: ExpressOptions): SampleExpressComponent {
     const express = new SampleExpressComponent({

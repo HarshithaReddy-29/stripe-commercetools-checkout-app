@@ -104,30 +104,31 @@ export class MockPaymentEnabler implements PaymentEnabler {
       environment: "test",
     };
 
-    return Promise.resolve({
-      baseOptions: {
-        sdk: new FakeSdk(sdkOptions),
-        processorUrl: options.processorUrl,
-        sessionId: options.sessionId,
-        environment: sdkOptions.environment,
-        onComplete: options.onComplete || (() => { }),
-        onError: options.onError || (() => { }),
-        paymentMethodConfig: {
-          applepay: {
-            isEnabled: true,
-          },
-          googlepay: {
-            isEnabled: true,
-          },
-        },
-        storedPaymentMethodsConfig: {
-          isEnabled: configJson.storedPaymentMethodsConfig.isEnabled,
-          storedPaymentMethods: storedPaymentMethodsList,
-        },
-        setStorePaymentDetails,
-        getStorePaymentDetails,
-      },
-    });
+return Promise.resolve({
+  baseOptions: {
+    sdk: new FakeSdk(sdkOptions),
+    processorUrl: options.processorUrl,
+    sessionId: options.sessionId,
+    environment: sdkOptions.environment,
+    countryCode: options.locale?.split('-')[1] ?? 'US',
+    currencyCode: 'USD',
+
+    onComplete: options.onComplete || (() => {}),
+    onError: options.onError || (() => {}),
+
+    paymentMethodConfig: {
+      applepay: { isEnabled: true },
+      googlepay: { isEnabled: true },
+    },
+
+    storedPaymentMethodsConfig: {
+      isEnabled: configJson.storedPaymentMethodsConfig.isEnabled,
+      storedPaymentMethods: storedPaymentMethodsList,
+    },
+    setStorePaymentDetails,
+    getStorePaymentDetails,
+  },
+});
   };
 
   async getStoredPaymentMethods({ allowedMethodTypes }) {
