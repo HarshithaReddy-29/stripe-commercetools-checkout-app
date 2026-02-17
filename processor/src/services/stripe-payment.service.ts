@@ -72,9 +72,20 @@ export class StripePaymentService extends AbstractPaymentService {
    */
   public async config(): Promise<ConfigResponse> {
     const config = getConfig();
+
     return {
       environment: config.mockEnvironment,
       publishableKey: config.stripePublishableKey,
+
+      // ✅ REQUIRED FOR EXPRESS
+      paymentMethodConfig: {
+        applepay: {
+          isEnabled: true,
+        },
+        googlepay: {
+          isEnabled: true,
+        },
+      },
     };
   }
 

@@ -75,12 +75,14 @@ describe('/operations APIs', () => {
     authorizationManager: jest.fn() as unknown as AuthorityAuthorizationManager,
     contextProvider: jest.fn() as unknown as ContextProvider<RequestContextData>,
   });
-
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ctRecurringPaymentJobService = jest.fn() as any;
   const spiedPaymentService = new StripePaymentService({
     ctCartService: jest.fn() as unknown as CommercetoolsCartService,
     ctPaymentService: jest.fn() as unknown as CommercetoolsPaymentService,
     ctOrderService: jest.fn() as unknown as CommercetoolsOrderService,
     ctPaymentMethodService: jest.fn() as unknown as CommercetoolsPaymentMethodService,
+    ctRecurringPaymentJobService,
   });
 
   beforeAll(async () => {
