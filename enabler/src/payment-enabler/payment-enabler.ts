@@ -257,6 +257,12 @@ export type EnablerOptions = {
    * The Stripe customer ID.
    */
   stripeCustomerId?: string;
+  projectKey: string;
+  authUrl: string;
+  sessionUrl: string;
+  clientId: string;
+  clientSecret: string;
+  cartId: string;
 };
  
 /**
