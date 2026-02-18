@@ -216,6 +216,12 @@ export interface PaymentComponentBuilder {
 * Represents the options for the payment enabler.
 */
 export type EnablerOptions = {
+  cartId: string;
+  clientSecret: string;
+  clientId: string;
+  sessionUrl: string;
+  authUrl: string;
+  projectKey: string;
   /**
    * The URL of the payment processor.
    */

@@ -13,7 +13,12 @@ export abstract class DefaultExpressComponent implements ExpressComponent {
   protected currencyCode: string;
   protected expressOptions: ExpressOptions;
   protected availableShippingMethods: ExpressShippingOptionData[];
-  protected paymentMethodConfig: { [key: string]: string };
+  protected paymentMethodConfig?: {
+  [key: string]: {
+    isEnabled: boolean;
+  };
+};
+
   protected onComplete: OnComplete;
  
   constructor(opts: {
@@ -22,7 +27,12 @@ export abstract class DefaultExpressComponent implements ExpressComponent {
     sessionId: string;
     countryCode: string;
     currencyCode: string;
-    paymentMethodConfig: { [key: string]: string };
+paymentMethodConfig?: {
+  [key: string]: {
+    isEnabled: boolean;
+  };
+};
+
     onComplete: OnComplete;
   }) {
     this.expressOptions = opts.expressOptions;

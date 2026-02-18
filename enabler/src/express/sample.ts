@@ -11,7 +11,12 @@ export class SampleExpressBuilder implements PaymentExpressBuilder {
   private sessionId: string;
   private countryCode: string;
   private currencyCode: string;
-  private paymentMethodConfig: { [key: string]: string };
+  private paymentMethodConfig?: {
+  [key: string]: {
+    isEnabled: boolean;
+  };
+};
+
   private onComplete: OnComplete;
  
   constructor(baseOptions: BaseOptions) {
@@ -42,7 +47,12 @@ export class SampleExpressBuilder implements PaymentExpressBuilder {
 export class SampleExpressComponent extends DefaultExpressComponent {
   constructor(opts: { expressOptions: ExpressOptions
     processorUrl: string;
-    paymentMethodConfig: { [key: string]: string };
+paymentMethodConfig?: {
+  [key: string]: {
+    isEnabled: boolean;
+  };
+};
+
     sessionId: string;
     countryCode: string;
     currencyCode: string;
