@@ -68,24 +68,25 @@ export class MockPaymentEnabler implements PaymentEnabler {
     setStorePaymentDetails: (enabled: boolean) => void,
   ): Promise<{ baseOptions: BaseOptions }> => {
     // Fetch SDK config from processor
-    const sessionId = await createSession({
-      projectKey: options.projectKey,           
-      authUrl: options.authUrl,
-      sessionUrl: options.sessionUrl,
-      clientId: options.clientId,
-      clientSecret: options.clientSecret,
-
-      cartId: options.cartId,                    
-      processorUrl: options.processorUrl,
-      allowedPaymentMethods: [
-        "card",
-        "invoice",
-        "purchaseorder",
-        "dropin",
-        "applepay",
-        "googlepay",
-      ],
-    });
+    const sessionId =
+      options.sessionId ??
+      (await createSession({
+        projectKey: options.projectKey,
+        authUrl: options.authUrl,
+        sessionUrl: options.sessionUrl,
+        clientId: options.clientId,
+        clientSecret: options.clientSecret,
+        cartId: options.cartId,
+        processorUrl: options.processorUrl,
+        allowedPaymentMethods: [
+          "card",
+          "invoice",
+          "purchaseorder",
+          "dropin",
+          "applepay",
+          "googlepay",
+        ],
+      }));
     const configResponse = await fetch(
       options.processorUrl + "/operations/config",
       {
@@ -97,7 +98,21 @@ export class MockPaymentEnabler implements PaymentEnabler {
       }
     );
 
-    const configJson = await configResponse.json();
+    const configText = await configResponse.text();
+
+    if (!configResponse.ok) {
+      throw new Error(
+        `GET /operations/config failed (${configResponse.status}) ${configText.slice(0, 300)}`
+      );
+    }
+
+    let configJson: any;
+    try {
+      configJson = JSON.parse(configText);
+    } catch {
+      throw new Error(`GET /operations/config returned NON-JSON: ${configText.slice(0, 300)}`);
+    }
+
 
     let storedPaymentMethodsList: CocoStoredPaymentMethod[] = [];
     if (configJson.storedPaymentMethodsConfig.isEnabled === true) {
