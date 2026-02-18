@@ -128,7 +128,7 @@ export class MockPaymentEnabler implements PaymentEnabler {
       baseOptions: {
         sdk: new FakeSdk(sdkOptions),
         processorUrl: options.processorUrl,
-        sessionId: options.sessionId,
+        sessionId: sessionId,
         environment: sdkOptions.environment,
         countryCode: options.locale?.split('-')[1] ?? 'US',
         currencyCode: 'USD',
