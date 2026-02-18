@@ -13,10 +13,10 @@
     var CTP_AUTH_URL = !'%CTP_AUTH_URL%'.startsWith('%') && '%CTP_AUTH_URL%';
     var CTP_API_URL = !'%CTP_API_URL%'.startsWith('%') && '%CTP_API_URL%';
     var CTP_SESSION_URL = !'%CTP_SESSION_URL%'.startsWith('%') && '%CTP_SESSION_URL%';
-    var CTP_CLIENT_ID__ = !'%CTP_CLIENT_ID%'.startsWith('%') && '%CTP_CLIENT_ID%';
-    var CTP_CLIENT_SECRET__ = !'%CTP_CLIENT_SECRET%'.startsWith('%') && '%CTP_CLIENT_SECRET%';
-    var CTP_PROJECT_KEY__ = !'%CTP_PROJECT_KEY%'.startsWith('%') && '%CTP_PROJECT_KEY%';
-    var CTP_PROCESSOR_URL__ = !'%ctp_PROCESSOR_URL%'.startsWith('%') && '%CTP_PROCESSOR_URL%';
+    var CTP_CLIENT_ID = !'%CTP_CLIENT_ID%'.startsWith('%') && '%CTP_CLIENT_ID%';
+    var CTP_CLIENT_SECRET = !'%CTP_CLIENT_SECRET%'.startsWith('%') && '%CTP_CLIENT_SECRET%';
+    var CTP_PROJECT_KEY = !'%CTP_PROJECT_KEY%'.startsWith('%') && '%CTP_PROJECT_KEY%';
+    var CTP_PROCESSOR_URL = !'%ctp_PROCESSOR_URL%'.startsWith('%') && '%CTP_PROCESSOR_URL%';
   </script>
   <script src="../dev-utils/session.js"></script>
 </head>
@@ -73,14 +73,14 @@
             body: JSON.stringify({
               iss: "https://issuer.com",
               sub: "test-sub",
-              "https://issuer.com/claims/project_key": `${__VITE_CTP_PROJECT_KEY__}`,
+              "https://issuer.com/claims/project_key": `${CTP_PROJECT_KEY}`,
             }),
           });
 
           const accessToken = await response.json();
 
           const res = await fetch(
-            `${__VITE_PROCESSOR_URL__}/operations/payment-components`,
+            `${CTP_PROCESSOR_URL}/operations/payment-components`,
             {
               method: "GET",
               headers: {

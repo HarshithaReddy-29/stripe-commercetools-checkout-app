@@ -2,6 +2,8 @@ import { CardBuilder } from "../components/payment-methods/card/card";
 import { InvoiceBuilder } from "../components/payment-methods/invoice/invoice";
 import { PurchaseOrderBuilder } from "../components/payment-methods/purchase-order/purchase-order";
 import { FakeSdk } from "../fake-sdk";
+import { createSession } from "../utils/session-client";
+
 import {
   CocoStoredPaymentMethod,
   DropinType,
@@ -66,15 +68,33 @@ export class MockPaymentEnabler implements PaymentEnabler {
     setStorePaymentDetails: (enabled: boolean) => void,
   ): Promise<{ baseOptions: BaseOptions }> => {
     // Fetch SDK config from processor
+    const sessionId = await createSession({
+      projectKey: options.projectKey,           
+      authUrl: options.authUrl,
+      sessionUrl: options.sessionUrl,
+      clientId: options.clientId,
+      clientSecret: options.clientSecret,
+
+      cartId: options.cartId,                    
+      processorUrl: options.processorUrl,
+      allowedPaymentMethods: [
+        "card",
+        "invoice",
+        "purchaseorder",
+        "dropin",
+        "applepay",
+        "googlepay",
+      ],
+    });
     const configResponse = await fetch(
       options.processorUrl + "/operations/config",
       {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "X-Session-Id": options.sessionId,
+          "X-Session-Id": sessionId,
         },
-      },
+      }
     );
 
     const configJson = await configResponse.json();
@@ -87,7 +107,7 @@ export class MockPaymentEnabler implements PaymentEnabler {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            "X-Session-Id": options.sessionId,
+            "X-Session-Id": sessionId,
           },
         },
       );
@@ -104,31 +124,31 @@ export class MockPaymentEnabler implements PaymentEnabler {
       environment: "test",
     };
 
-return Promise.resolve({
-  baseOptions: {
-    sdk: new FakeSdk(sdkOptions),
-    processorUrl: options.processorUrl,
-    sessionId: options.sessionId,
-    environment: sdkOptions.environment,
-    countryCode: options.locale?.split('-')[1] ?? 'US',
-    currencyCode: 'USD',
+    return Promise.resolve({
+      baseOptions: {
+        sdk: new FakeSdk(sdkOptions),
+        processorUrl: options.processorUrl,
+        sessionId: options.sessionId,
+        environment: sdkOptions.environment,
+        countryCode: options.locale?.split('-')[1] ?? 'US',
+        currencyCode: 'USD',
 
-    onComplete: options.onComplete || (() => {}),
-    onError: options.onError || (() => {}),
+        onComplete: options.onComplete || (() => { }),
+        onError: options.onError || (() => { }),
 
-    paymentMethodConfig: {
-      applepay: { isEnabled: true },
-      googlepay: { isEnabled: true },
-    },
+        paymentMethodConfig: {
+          applepay: { isEnabled: true },
+          googlepay: { isEnabled: true },
+        },
 
-    storedPaymentMethodsConfig: {
-      isEnabled: configJson.storedPaymentMethodsConfig.isEnabled,
-      storedPaymentMethods: storedPaymentMethodsList,
-    },
-    setStorePaymentDetails,
-    getStorePaymentDetails,
-  },
-});
+        storedPaymentMethodsConfig: {
+          isEnabled: configJson.storedPaymentMethodsConfig.isEnabled,
+          storedPaymentMethods: storedPaymentMethodsList,
+        },
+        setStorePaymentDetails,
+        getStorePaymentDetails,
+      },
+    });
   };
 
   async getStoredPaymentMethods({ allowedMethodTypes }) {
