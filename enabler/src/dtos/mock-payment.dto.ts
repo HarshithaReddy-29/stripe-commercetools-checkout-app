@@ -52,5 +52,5 @@ export const CustomerResponseSchema = Type.Object({
 export type PaymentRequestSchemaDTO = Static<typeof PaymentRequestSchema>;
 export type PaymentResponseSchemaDTO = Static<typeof PaymentResponseSchema>;
 export type ConfigElementResponseSchemaDTO = Static<typeof ConfigElementResponseSchema>;
-export type ConfigResponseSchemaDTO = Static<typeof ConfigResponseSchema>;
+//export type ConfigResponseSchemaDTO = Static<typeof ConfigResponseSchema>;
 export type CustomerResponseSchemaDTO = Static<typeof CustomerResponseSchema>;
