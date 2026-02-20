@@ -46,7 +46,7 @@ export const config = {
   // Payment Providers config
   paymentInterface: process.env.PAYMENT_INTERFACE || 'checkout-stripe',
   merchantReturnUrl: process.env.MERCHANT_RETURN_URL || '',
-
+  allowedOrigins: process.env.ALLOWED_ORIGINS, 
   /**
    * Enable multicapture and multirefund support for Stripe payments
    * When enabled, allows:

@@ -24,6 +24,7 @@ import {
 } from '../dtos/operations/payment-intents.dto';
 import { StripeEvent } from '../services/types/stripe-payment.type';
 import { GetExpressConfigRequestDTO, GetExpressConfigResponseDTO} from '../dtos/stripe-payment.dto';
+import { corsAuthHook } from '../libs/fastify/cors/cors';
 
 type PaymentRoutesOptions = {
   paymentService: StripePaymentService;
@@ -225,7 +226,4 @@ export const configElementRoutes = async (
     return reply.status(200).send(resp);
   });
 };
-function corsAuthHook(): import("fastify").preHandlerHookHandler<import("fastify").RawServerDefault, import("http").IncomingMessage, import("http").ServerResponse<import("http").IncomingMessage>, { Body: GetExpressConfigRequestDTO; Reply: GetExpressConfigResponseDTO; }, unknown, NoInfer<import("fastify").FastifySchema>, import("fastify").FastifyTypeProviderDefault, import("fastify").FastifyBaseLogger> {
-  throw new Error('Function not implemented.');
-}
 
