@@ -85,6 +85,9 @@ deployAs:
         - key: STRIPE_EXPRESS_CHECKOUT_CONTAINER_ID
           description: The HTML ID where the Express Checkout Element will be mounted.
           default: 'stripe-express-checkout-element'
+        - key: ALLOWED_ORIGINS
+          description: This field is primarily required for using express payment methods. If you have / plan to use an express payment integration with commercetools checkout, please provide this value. If you have multiple values, it should be comma separated.
+          required: false
       securedConfiguration:
         - key: CTP_CLIENT_SECRET
           description: commercetools client secret.
