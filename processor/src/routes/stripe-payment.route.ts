@@ -23,6 +23,7 @@ import {
   PaymentModificationStatus,
 } from '../dtos/operations/payment-intents.dto';
 import { StripeEvent } from '../services/types/stripe-payment.type';
+import { GetExpressConfigRequestDTO, GetExpressConfigResponseDTO} from '../dtos/stripe-payment.dto';
 
 type PaymentRoutesOptions = {
   paymentService: StripePaymentService;
@@ -61,6 +62,19 @@ export const customerRoutes = async (fastify: FastifyInstance, opts: FastifyPlug
  *
  */
 export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPluginOptions & PaymentRoutesOptions) => {
+    fastify.post<{ Body: GetExpressConfigRequestDTO; Reply: GetExpressConfigResponseDTO }>(
+      '/express-config',
+      {
+        preHandler: [corsAuthHook()],
+      },
+      async (request, reply) => {
+        const response = await opts.paymentService.expressConfig({
+          data: request.body,
+        });
+        return reply.status(200).send(response);
+      },
+    );
+  
   fastify.get<{ Reply: PaymentResponseSchemaDTO }>(
     '/payments',
     {
@@ -211,3 +225,7 @@ export const configElementRoutes = async (
     return reply.status(200).send(resp);
   });
 };
+function corsAuthHook(): import("fastify").preHandlerHookHandler<import("fastify").RawServerDefault, import("http").IncomingMessage, import("http").ServerResponse<import("http").IncomingMessage>, { Body: GetExpressConfigRequestDTO; Reply: GetExpressConfigResponseDTO; }, unknown, NoInfer<import("fastify").FastifySchema>, import("fastify").FastifyTypeProviderDefault, import("fastify").FastifyBaseLogger> {
+  throw new Error('Function not implemented.');
+}
+

@@ -1,5 +1,7 @@
 import { Static, Type } from '@sinclair/typebox';
 import { PaymentMethodType, PaymentOutcomeSchema } from './mock-payment.dto';
+import { ConfigResponseSchemaDTO } from './operations/config.dto';
+import { PaymentMethod } from '@commercetools/connect-payments-sdk';
 
 export const CreatePaymentMethodSchema = Type.Object({
   type: Type.Union([Type.Enum(PaymentMethodType), Type.String()]),
@@ -66,6 +68,13 @@ export const CustomerResponseSchema = Type.Optional(
     sessionId: Type.String(),
   }),
 );
+export type GetExpressConfigRequestDTO = {
+  countryCode: string;
+};
+export type GetExpressConfigResponseDTO = {
+publishableKey: string;
+expressPaymentMethods: string[];
+};
 
 export type PaymentRequestSchemaDTO = Static<typeof PaymentRequestSchema>;
 export type PaymentResponseSchemaDTO = Static<typeof PaymentResponseSchema>;

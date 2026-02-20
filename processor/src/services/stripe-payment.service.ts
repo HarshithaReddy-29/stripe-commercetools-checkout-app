@@ -31,6 +31,8 @@ import {
   CollectBillingAddressOptions,
   ConfigElementResponseSchemaDTO,
   CustomerResponseSchemaDTO,
+  GetExpressConfigRequestDTO,
+  GetExpressConfigResponseDTO,
   PaymentOutcome,
   PaymentResponseSchemaDTO,
 } from '../dtos/stripe-payment.dto';
@@ -210,8 +212,8 @@ export class StripePaymentService extends AbstractPaymentService {
         amount_to_capture: amountToBeCaptured,
         ...(isPartialCapture &&
           config.stripeEnableMultiOperations && {
-            final_capture: false,
-          }),
+          final_capture: false,
+        }),
       });
 
       log.info(`Payment modification completed.`, {
@@ -414,7 +416,18 @@ export class StripePaymentService extends AbstractPaymentService {
       throw wrapStripeError(error);
     }
   }
+  public async expressConfig({
+    data,
+  }: {
+    data: GetExpressConfigRequestDTO;
+  }): Promise<GetExpressConfigResponseDTO> {
+    const config = getConfig();
 
+    return {
+      publishableKey: config.stripePublishableKey,
+      expressPaymentMethods: ['applepay', 'googlepay'],
+    };
+  }
   /**
    * Creates a payment intent using the Stripe API and create commercetools payment with Initial transaction.
    *
@@ -495,8 +508,8 @@ export class StripePaymentService extends AbstractPaymentService {
       }),
       ...(!ctCart.customerId &&
         ctCart.anonymousId && {
-          anonymousId: ctCart.anonymousId,
-        }),
+        anonymousId: ctCart.anonymousId,
+      }),
       transactions: [
         {
           type: PaymentTransactions.AUTHORIZATION,
