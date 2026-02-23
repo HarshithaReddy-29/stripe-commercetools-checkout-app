@@ -26,7 +26,6 @@ type OperationRouteOptions = {
 };
 
 export const operationsRoute = async (fastify: FastifyInstance, opts: FastifyPluginOptions & OperationRouteOptions) => {
-
   fastify.get<{ Reply: StatusResponseSchemaDTO }>(
     '/status',
     {
@@ -43,6 +42,21 @@ export const operationsRoute = async (fastify: FastifyInstance, opts: FastifyPlu
     },
   );
 
+  fastify.get<{ Reply: ConfigResponseSchemaDTO }>(
+    '/config',
+    {
+      //preHandler: [opts.sessionHeaderAuthHook.authenticate()],
+      schema: {
+        response: {
+          200: ConfigResponseSchema,
+        },
+      },
+    },
+    async (_, reply) => {
+      const config = await opts.paymentService.config();
+      reply.code(200).send(config);
+    },
+  );
   fastify.get(
     '/payment-components',
     {
