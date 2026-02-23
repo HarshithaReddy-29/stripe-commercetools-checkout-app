@@ -132,7 +132,7 @@ private static _Setup = async (
 
   // 5) Use THE SAME sessionId for stored-payment-methods
   let storedPaymentMethodsList: CocoStoredPaymentMethod[] = [];
-  if (configJson.storedPaymentMethodsConfig.isEnabled === true) {
+  if (configJson.storedPaymentMethodsConfig?.isEnabled === true) {
     const response = await fetch(options.processorUrl + "/stored-payment-methods", {
       method: "GET",
       headers: {
@@ -177,7 +177,7 @@ private static _Setup = async (
       },
 
       storedPaymentMethodsConfig: {
-        isEnabled: configJson.storedPaymentMethodsConfig.isEnabled,
+        isEnabled: configJson.storedPaymentMethodsConfig?.isEnabled,
         storedPaymentMethods: storedPaymentMethodsList,
       },
 
@@ -192,7 +192,7 @@ private static _Setup = async (
     const setupData = await this.setupData;
 
     const storedPaymentMethods =
-      setupData.baseOptions.storedPaymentMethodsConfig.storedPaymentMethods
+      setupData.baseOptions.storedPaymentMethodsConfig?.storedPaymentMethods
         .map(({ token, ...storedPaymentMethod }) => storedPaymentMethod)
         .filter((method) => allowedMethodTypes.includes(method.type));
 
@@ -201,7 +201,7 @@ private static _Setup = async (
 
   async isStoredPaymentMethodsEnabled(): Promise<boolean> {
     const setupData = await this.setupData;
-    return setupData.baseOptions.storedPaymentMethodsConfig.isEnabled;
+    return setupData.baseOptions.storedPaymentMethodsConfig?.isEnabled;
   }
 
   setStorePaymentDetails = (enabled: boolean): void => {
@@ -240,7 +240,7 @@ private static _Setup = async (
   ): Promise<StoredComponentBuilder | never> {
     const setupData = await this.setupData;
 
-    if (!setupData.baseOptions.storedPaymentMethodsConfig.isEnabled) {
+    if (!setupData.baseOptions.storedPaymentMethodsConfig?.isEnabled) {
       throw new Error(
         "Stored payment methods is not enabled and thus cannot be used to build a new component",
       );
