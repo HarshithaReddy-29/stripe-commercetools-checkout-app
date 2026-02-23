@@ -2,6 +2,8 @@ import { CardBuilder } from "../components/payment-methods/card/card";
 import { InvoiceBuilder } from "../components/payment-methods/invoice/invoice";
 import { PurchaseOrderBuilder } from "../components/payment-methods/purchase-order/purchase-order";
 import { FakeSdk } from "../fake-sdk";
+import { createSession } from "../utils/session-client";
+
 import {
   CocoStoredPaymentMethod,
   DropinType,
@@ -17,7 +19,6 @@ import { DropinEmbeddedBuilder } from "../dropin/dropin-embedded";
 import { CustomTestMethodBuilder } from "../components/payment-methods/custom-test-method/custom-test-method";
 import { StoredCardBuilder } from "../stored/stored-payment-methods/card";
 import { SampleExpressBuilder } from "../express/sample";
-import { createSession } from "../utils/session-client";
 
 
 export type StoredPaymentMethodsConfig = {
@@ -32,12 +33,11 @@ export type BaseOptions = {
   currencyCode?: string;
   sessionId: string;
   environment: string;
-paymentMethodConfig?: {
-  [key: string]: {
-    isEnabled: boolean;
+  paymentMethodConfig?: {
+    [key: string]: {
+      isEnabled: boolean;
+    };
   };
-};
-
   locale?: string;
   onComplete: (result: PaymentResult) => void;
   onError: (error: any, context?: { paymentReference?: string }) => void;
@@ -61,37 +61,16 @@ export class MockPaymentEnabler implements PaymentEnabler {
   getAvailableMethods(): Promise<string[]> {
     throw new Error("Method not implemented.");
   }
-private static _Setup = async (
-  options: EnablerOptions,
-  getStorePaymentDetails: () => boolean,
-  setStorePaymentDetails: (enabled: boolean) => void,
-): Promise<{ baseOptions: BaseOptions }> => {
 
-  // 1) Start with the sessionId passed from UI
-  let sessionId = options.sessionId;
-
-  // 2) Call config once with that sessionId
-  let configResponse = await fetch(options.processorUrl + "/operations/config", {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Session-Id": sessionId,
-    },
-  });
-
-  // 3) If session is invalid/inactive, create a NEW session and retry ONCE
-  if (!configResponse.ok) {
-    const bodyText = await configResponse.text();
-
-    // Only refresh session for session-related failures
-    const looksLikeSessionError =
-      configResponse.status === 401 ||
-      configResponse.status === 400 ||
-      bodyText.includes("Session is not active") ||
-      bodyText.includes("invalid_token");
-
-    if (looksLikeSessionError) {
-      sessionId = await createSession({
+  private static _Setup = async (
+    options: EnablerOptions,
+    getStorePaymentDetails: () => boolean,
+    setStorePaymentDetails: (enabled: boolean) => void,
+  ): Promise<{ baseOptions: BaseOptions }> => {
+    // Fetch SDK config from processor
+    const sessionId =
+      options.sessionId ??
+      (await createSession({
         projectKey: options.projectKey,
         authUrl: options.authUrl,
         sessionUrl: options.sessionUrl,
@@ -107,92 +86,91 @@ private static _Setup = async (
           "applepay",
           "googlepay",
         ],
-      });
-
-      // retry config with new session
-      configResponse = await fetch(options.processorUrl + "/operations/config", {
+      }));
+    const configResponse = await fetch(
+      options.processorUrl + "/operations/config",
+      {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
           "X-Session-Id": sessionId,
         },
-      });
-    }
-  }
-
-  // 4) If still not ok, throw the real response so you don't get "<!DOCTYPE>" JSON parse errors
-  if (!configResponse.ok) {
-    const errText = await configResponse.text();
-    throw new Error(
-      `Config call failed: ${configResponse.status} ${configResponse.statusText}. Body: ${errText}`,
+      }
     );
-  }
 
-  const configJson = await configResponse.json();
+    const configText = await configResponse.text();
 
-  // 5) Use THE SAME sessionId for stored-payment-methods
-  let storedPaymentMethodsList: CocoStoredPaymentMethod[] = [];
-  if (configJson.storedPaymentMethodsConfig.isEnabled === true) {
-    const response = await fetch(options.processorUrl + "/stored-payment-methods", {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Session-Id": sessionId,
-      },
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
+    if (!configResponse.ok) {
       throw new Error(
-        `Stored PM call failed: ${response.status} ${response.statusText}. Body: ${errText}`,
+        `GET /operations/config failed (${configResponse.status}) ${configText.slice(0, 300)}`
       );
     }
 
-    const storedPaymentMethods: { storedPaymentMethods: CocoStoredPaymentMethod[] } =
-      await response.json();
+    let configJson: any;
+    try {
+      configJson = JSON.parse(configText);
+    } catch {
+      throw new Error(`GET /operations/config returned NON-JSON: ${configText.slice(0, 300)}`);
+    }
 
-    storedPaymentMethodsList = storedPaymentMethods.storedPaymentMethods;
-  }
 
-  const sdkOptions = { environment: "test" };
+    let storedPaymentMethodsList: CocoStoredPaymentMethod[] = [];
+    if (configJson.storedPaymentMethodsConfig?.isEnabled === true) {
+      const response = await fetch(
+        options.processorUrl + "/stored-payment-methods",
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Session-Id": sessionId,
+          },
+        },
+      );
 
-  return Promise.resolve({
-    baseOptions: {
-      sdk: new FakeSdk(sdkOptions),
-      processorUrl: options.processorUrl,
+      const storedPaymentMethods: {
+        storedPaymentMethods: CocoStoredPaymentMethod[];
+      } = await response.json();
 
-      // ✅ IMPORTANT: use refreshed sessionId, not options.sessionId
-      sessionId,
+      storedPaymentMethodsList = storedPaymentMethods.storedPaymentMethods;
+    }
 
-      environment: sdkOptions.environment,
-      countryCode: options.locale?.split("-")[1] ?? "US",
-      currencyCode: "USD",
+    const sdkOptions = {
+      // environment: configJson.environment,
+      environment: "test",
+    };
 
-      onComplete: options.onComplete || (() => {}),
-      onError: options.onError || (() => {}),
+    return Promise.resolve({
+      baseOptions: {
+        sdk: new FakeSdk(sdkOptions),
+        processorUrl: options.processorUrl,
+        sessionId: sessionId,
+        environment: sdkOptions.environment,
+        countryCode: options.locale?.split('-')[1] ?? 'US',
+        currencyCode: 'USD',
 
-      paymentMethodConfig: {
-        applepay: { isEnabled: true },
-        googlepay: { isEnabled: true },
+        onComplete: options.onComplete || (() => { }),
+        onError: options.onError || (() => { }),
+
+        paymentMethodConfig: {
+          applepay: { isEnabled: true },
+          googlepay: { isEnabled: true },
+        },
+
+        storedPaymentMethodsConfig: {
+          isEnabled: configJson.storedPaymentMethodsConfig?.isEnabled,
+          storedPaymentMethods: storedPaymentMethodsList,
+        },
+        setStorePaymentDetails,
+        getStorePaymentDetails,
       },
-
-      storedPaymentMethodsConfig: {
-        isEnabled: configJson.storedPaymentMethodsConfig.isEnabled,
-        storedPaymentMethods: storedPaymentMethodsList,
-      },
-
-      setStorePaymentDetails,
-      getStorePaymentDetails,
-    },
-  });
-};
-
+    });
+  };
 
   async getStoredPaymentMethods({ allowedMethodTypes }) {
     const setupData = await this.setupData;
 
     const storedPaymentMethods =
-      setupData.baseOptions.storedPaymentMethodsConfig.storedPaymentMethods
+      setupData.baseOptions.storedPaymentMethodsConfig?.storedPaymentMethods
         .map(({ token, ...storedPaymentMethod }) => storedPaymentMethod)
         .filter((method) => allowedMethodTypes.includes(method.type));
 
@@ -201,7 +179,7 @@ private static _Setup = async (
 
   async isStoredPaymentMethodsEnabled(): Promise<boolean> {
     const setupData = await this.setupData;
-    return setupData.baseOptions.storedPaymentMethodsConfig.isEnabled;
+    return setupData.baseOptions.storedPaymentMethodsConfig?.isEnabled;
   }
 
   setStorePaymentDetails = (enabled: boolean): void => {
@@ -240,7 +218,7 @@ private static _Setup = async (
   ): Promise<StoredComponentBuilder | never> {
     const setupData = await this.setupData;
 
-    if (!setupData.baseOptions.storedPaymentMethodsConfig.isEnabled) {
+    if (!setupData.baseOptions.storedPaymentMethodsConfig?.isEnabled) {
       throw new Error(
         "Stored payment methods is not enabled and thus cannot be used to build a new component",
       );
