@@ -29,7 +29,7 @@ export const operationsRoute = async (fastify: FastifyInstance, opts: FastifyPlu
   fastify.get<{ Reply: ConfigResponseSchemaDTO }>(
     '/config',
     {
-      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
+      //preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
         response: {
           200: ConfigResponseSchema,
