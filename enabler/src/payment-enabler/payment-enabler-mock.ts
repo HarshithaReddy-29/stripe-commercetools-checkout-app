@@ -32,6 +32,7 @@ export type BaseOptions = {
   currencyCode?: string;
   sessionId: string;
   environment: string;
+  publishableKey: string;
 paymentMethodConfig?: {
   [key: string]: {
     isEnabled: boolean;
@@ -167,7 +168,7 @@ private static _Setup = async (
       environment: sdkOptions.environment,
       countryCode: options.locale?.split("-")[1] ?? "US",
       currencyCode: "USD",
-
+      publishableKey: "pk_test_51SXS00QbWNk38Ympevb8B6IQiUvbc779vEePauTfcnfVtZPnrGLvrtYznPm6epyIdxkHWCoKshIW8fGUp9wMOASh00br9wFNTv",
       onComplete: options.onComplete || (() => {}),
       onError: options.onError || (() => {}),
 

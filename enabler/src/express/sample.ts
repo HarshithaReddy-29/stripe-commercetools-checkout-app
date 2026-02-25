@@ -5,12 +5,14 @@ import {
 } from "../payment-enabler/payment-enabler";
 import { BaseOptions } from "../payment-enabler/payment-enabler-mock";
 import { DefaultExpressComponent } from "./base";
- 
+import { loadStripe } from "@stripe/stripe-js";
+//import config from "../processor/src/config/config.ts";
 export class SampleExpressBuilder implements PaymentExpressBuilder {
   private processorUrl: string;
   private sessionId: string;
   private countryCode: string;
   private currencyCode: string;
+  private publishableKey: string;
   private paymentMethodConfig?: {
   [key: string]: {
     isEnabled: boolean;
@@ -24,6 +26,7 @@ export class SampleExpressBuilder implements PaymentExpressBuilder {
     this.sessionId = baseOptions.sessionId;
     this.countryCode = baseOptions.countryCode;
     this.currencyCode = baseOptions.currencyCode;
+    this.publishableKey = baseOptions.publishableKey;
     this.paymentMethodConfig = baseOptions.paymentMethodConfig;
     this.onComplete = baseOptions.onComplete;
   }
@@ -35,6 +38,7 @@ export class SampleExpressBuilder implements PaymentExpressBuilder {
       sessionId: this.sessionId,
       countryCode: this.countryCode,
       currencyCode: this.currencyCode,
+      publishableKey: this.publishableKey,
       paymentMethodConfig: this.paymentMethodConfig,
       onComplete: config.onComplete || this.onComplete,
     });
@@ -47,6 +51,7 @@ export class SampleExpressBuilder implements PaymentExpressBuilder {
 export class SampleExpressComponent extends DefaultExpressComponent {
   constructor(opts: { expressOptions: ExpressOptions
     processorUrl: string;
+    publishableKey:string;
 paymentMethodConfig?: {
   [key: string]: {
     isEnabled: boolean;
@@ -64,6 +69,7 @@ paymentMethodConfig?: {
       sessionId: opts.sessionId,
       countryCode: opts.countryCode,
       currencyCode: opts.currencyCode,
+      publishableKey: opts.publishableKey,
       paymentMethodConfig: opts.paymentMethodConfig,
       onComplete: opts.onComplete,
     })
@@ -77,9 +83,21 @@ paymentMethodConfig?: {
   }
  
   // To be called when mounting the component
-  mount(selector: string): void {
-    document
-      .querySelector(selector)
-      .insertAdjacentHTML("afterbegin", `Sample express component with sessionId: ${this.sessionId} mounted.`);
+async mount(selector: string): Promise<void> {
+ 
+  const stripe = await loadStripe(this.publishableKey);
+ 
+  if (!stripe) {
+    console.error("Stripe failed to load");
+    return;
   }
+ 
+  const elements = stripe.elements({
+    clientSecret: this.sessionId,
+  });
+ 
+  const expressCheckout = elements.create("expressCheckout");
+ 
+  expressCheckout.mount(selector);
+}
 }

@@ -13,6 +13,7 @@ export abstract class DefaultExpressComponent implements ExpressComponent {
   protected currencyCode: string;
   protected expressOptions: ExpressOptions;
   protected availableShippingMethods: ExpressShippingOptionData[];
+  protected publishableKey: string;
   protected paymentMethodConfig?: {
   [key: string]: {
     isEnabled: boolean;
@@ -27,6 +28,7 @@ export abstract class DefaultExpressComponent implements ExpressComponent {
     sessionId: string;
     countryCode: string;
     currencyCode: string;
+    publishableKey: string;
 paymentMethodConfig?: {
   [key: string]: {
     isEnabled: boolean;
@@ -40,6 +42,7 @@ paymentMethodConfig?: {
     this.sessionId = opts.sessionId;
     this.countryCode = opts.countryCode;
     this.currencyCode = opts.currencyCode;
+    this.publishableKey = opts.publishableKey;
     this.paymentMethodConfig = opts.paymentMethodConfig;
     this.onComplete = opts.onComplete;
   }
