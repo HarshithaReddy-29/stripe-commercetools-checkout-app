@@ -117,6 +117,8 @@ deployAs:
   - name: paymentCapture
     applicationType: job
     endpoint: /capture-m2h
+    properties:
+      schedule: "0 2 * * *" # once in a day at 2 am
     configuration:
       standardConfiguration:
         - key: CTP_PROJECT_KEY
