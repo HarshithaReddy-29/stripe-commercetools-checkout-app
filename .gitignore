@@ -1,17 +1,14 @@
-# Code Editor directories and files
-.idea
-.env
-.idea/*
+node_modules
+coverage
+.terraform
+*.tfstate*
+*.tfvars
 
-# MCP (Model Context Protocol) configuration and data
-.mcp/
 .DS_Store
-
-#Context documentation
-docs/context7-libraries
-context
-context7-config.json
-CLAUDE.md
-
-# Connect CLI generated files
-.connect
+.vscode
+build/
+.env
+public/
+.connect/
+dist/
+**/dist/
