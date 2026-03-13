@@ -4,87 +4,91 @@ deployAs:
   - name: processor
     applicationType: service
     endpoint: /
-    scripts:
-      postDeploy: npm install && npm run connector:post-deploy
-      preUndeploy: npm install && npm run connector:pre-undeploy
     configuration:
       standardConfiguration:
         - key: CTP_PROJECT_KEY
           description: commercetools project key
           required: true
+          default: fujifilm-gmsb-global-dev
         - key: CTP_AUTH_URL
-          description: commercetools Auth URL (example - https://auth.europe-west1.gcp.commercetools.com).
+          description: commercetools Auth URL (example - https://auth.us-central1.gcp.commercetools.com).
           required: true
-          default: https://auth.europe-west1.gcp.commercetools.com
+          default: https://auth.us-central1.gcp.commercetools.com
         - key: CTP_API_URL
-          description: commercetools API URL (example - https://api.europe-west1.gcp.commercetools.com).
+          description: commercetools API URL (example - https://api.us-central1.gcp.commercetools.com).
           required: true
-          default: https://api.europe-west1.gcp.commercetools.com
+          default: https://api.us-central1.gcp.commercetools.com
         - key: CTP_SESSION_URL
-          description: Session API URL (example - https://session.europe-west1.gcp.commercetools.com).
+          description: Session API URL (example - https://session.api.us-central1.gcp.commercetools.com).
           required: true
-          default: https://session.europe-west1.gcp.commercetools.com
+          default: https://session.us-central1.gcp.commercetools.com
         - key: CTP_CHECKOUT_URL
-          description: Checkout API URL (example - https://checkout.europe-west1.gcp.commercetools.com).
+          description: Checkout API URL (example - https://checkout.us-central1.gcp.commercetools.com).
           required: true
+          default: https://checkout.us-central1.gcp.commercetools.com/
         - key: CTP_JWKS_URL
-          description: JWKs url (example - https://mc-api.europe-west1.gcp.commercetools.com/.well-known/jwks.json)
+          description: JWKs url (example - https://mc-api.us-central1.gcp.commercetools.com/.well-known/jwks.json)
           required: true
-          default: https://mc-api.europe-west1.gcp.commercetools.com/.well-known/jwks.json
+          default: https://mc-api.us-central1.gcp.commercetools.com/.well-known/jwks.json
         - key: CTP_JWT_ISSUER
-          description: JWT Issuer for jwt validation (example - https://mc-api.europe-west1.gcp.commercetools.com)
+          description: JWT Issuer for jwt validation (example - https://mc-api.us-central1.gcp.commercetools.com/.well-known/jwks.json)
           required: true
-          default: https://mc-api.europe-west1.gcp.commercetools.com
+          default: https://mc-api.us-central1.gcp.commercetools.com
         - key: STRIPE_CAPTURE_METHOD
           description: Stripe capture method (example - manual|automatic).
-          default: automatic
+          default: manual
         - key: STRIPE_WEBHOOK_ID
           description: Stripe unique identifier for the Webhook Endpoints (example - we_*****).
           required: true
+          default: we_1SsOo7QbWNk38YmpJjyU2c5g
+        - key: STRIPE_WEBHOOK_ID_CA
+          description: Stripe unique identifier for the Webhook Endpoints (example - we_*****).
+          required: true
+          default: we_1SsOeHH9ssFNaJrkuEyZtuUZ
+        - key: STRIPE_WEBHOOK_ID_EU
+          description: Stripe unique identifier for the Webhook Endpoints (example - we_*****).
+          required: true
+          default: we_1SxD5tHiBVKOneR6w9jSxP9K
         - key: STRIPE_APPEARANCE_PAYMENT_ELEMENT
           description: Stripe Appearance for Payment Element (example - {"theme":"night","labels":"floating"} ).
-        - key: STRIPE_LAYOUT
-          description: Stripe Layout for Payment Element (example - {"type":"accordion","defaultCollapsed":false,"radios":true,"spacedAccordionItems":false} ).
-          default: '{"type":"tabs","defaultCollapsed":false}'
+          default: '{"theme":"stripe","labels":"above","variables":{"colorPrimary":"#01916D","colorTextSecondary":"#333333","colorBackground":"#ffffff","colorText":"#333333","colorSuccess":"#67AC1E","colorWarning":"#FBC02D","colorTextPlaceholder":"#858585","colorDanger":"#E53835","fontFamily":"Roboto, sans-serif","spacingUnit":"0.25rem","borderRadius":"0.25rem","fontSizeBase":"1rem"}}'
         - key: STRIPE_APPEARANCE_EXPRESS_CHECKOUT
           description: Stripe Appearance for Express Checkout (example - {"theme":"stripe","variables":{"colorPrimary":"\#0570DE","colorBackground":"\#FFFFFF","colorText":"\#30313D","colorDanger":"\#DF1B41","fontFamily":"Ideal Sans,system-ui,sansserif","spacingUnit":"2px","borderRadius":"4px"}}).
+          default: '{"theme":"stripe","labels":"above","variables":{"colorPrimary":"#01916D","colorTextSecondary":"#333333","colorBackground":"#ffffff","colorText":"#333333","colorSuccess":"#67AC1E","colorWarning":"#FBC02D","colorTextPlaceholder":"#858585","colorDanger":"#E53835","fontFamily":"Roboto, sans-serif","spacingUnit":"0.25rem","borderRadius":"0.25rem","fontSizeBase":"1rem"}}'
+        - key: STRIPE_LAYOUT
+          description: Stripe Layout for Payment Element (example - {"type":"accordion","defaultCollapsed":false,"radios":true,"spacedAccordionItems":false} ).
+          default: '{"type":"tabs"}'
         - key: STRIPE_PUBLISHABLE_KEY
           description: Stripe Publishable Key
           required: true
+          default: pk_test_51SXS00QbWNk38Ympevb8B6IQiUvbc779vEePauTfcnfVtZPnrGLvrtYznPm6epyIdxkHWCoKshIW8fGUp9wMOASh00br9wFNTv
+        - key: STRIPE_PUBLISHABLE_KEY_CA
+          description: Stripe Publishable Key
+          required: true
+          default: pk_test_51SXRz5H9ssFNaJrkt3Mgb4YXWaqbYFf4dPWEVgF87lnm1UHcZqtbuF33rrNIrJvzlmBXlRUWBqcF4ztR155LSkPt0057DDWexF
+        - key: STRIPE_PUBLISHABLE_KEY_EU
+          description: Stripe Publishable Key
+          required: true
+          default: pk_test_51SrdzgHiBVKOneR6oyvignyCZoArM1hAewacOOxHIkXJeteZlZhmow79RYueGI6BhOQ69zGbBEBdruaFwBfkry6A00ejLdCyMT
         - key: STRIPE_APPLE_PAY_WELL_KNOWN
           description: Domain association file from Stripe. (example - https://stripe.com/files/apple-pay/apple-developer-merchantid-domain-association)
         - key: STRIPE_SAVED_PAYMENT_METHODS_CONFIG
           description: Stripe configuration for saved payment methods (example - {"payment_method_save":"enabled","payment_method_save_usage":"off_session","payment_method_redisplay":"enabled","payment_method_redisplay_limit":10}).
-          default: '{"payment_method_save":"disabled"}'
+          default: '{"payment_method_save":"enabled","payment_method_save_usage":"on_session","payment_method_redisplay":"enabled","payment_method_redisplay_limit":10,"payment_method_remove":"enabled"}'
         - key: MERCHANT_RETURN_URL
           description: Merchant return URL
           required: true
+          default: https://example.com/success
         - key: PAYMENT_INTERFACE
           description: The payment interface value used in the commercetools payment/payment methods. Default value is "checkout-stripe".
           required: false
         - key: STRIPE_COLLECT_BILLING_ADDRESS
           description: Stripe collect billing address information in Payment Element (example - 'auto' | 'never' | 'if_required').
-          default: 'auto'
+          default: 'never'
           required: true
         - key: STRIPE_ENABLE_MULTI_OPERATIONS
           description: Enable multicapture and multirefund support. Requires multicapture to be enabled in your Stripe account (example - true | false).
-          default: 'false'
-        - key: STORED_PAYMENT_METHODS_ENABLED
-          description: If set to "true" then the stored payment methods feature is enabled. Default value is "false".
-          required: false
-        - key: STORED_PAYMENT_METHODS_PAYMENT_INTERFACE
-          description: The payment method payment interface value used in the commerceotools payment methods. Default value is "psp-template".
-          required: false
-        - key: STORED_PAYMENT_METHODS_INTERFACE_ACCOUNT
-          description: The payment method interface account value used in the commerceotools payment methods.
-          required: false
-        - key: STRIPE_ENABLE_EXPRESS_CHECKOUT
-          description: Enable Stripe Express Checkout Element (true | false).
           default: 'true'
-          required: true
-        - key: STRIPE_EXPRESS_CHECKOUT_CONTAINER_ID
-          description: The HTML ID where the Express Checkout Element will be mounted.
-          default: 'stripe-express-checkout-element'
       securedConfiguration:
         - key: CTP_CLIENT_SECRET
           description: commercetools client secret.
@@ -93,8 +97,57 @@ deployAs:
           description: commercetools client ID with manage_payments, manage_orders, view_sessions, view_api_clients, manage_checkout_payment_intents, introspect_oauth_tokens, manage_types and view_types scopes
           required: true
         - key: STRIPE_SECRET_KEY
-          description: Stripe secret key (example - sk_*****).
+          description: Stripe secret key for US region (sk_test_*)
+          required: true
+        - key: STRIPE_SECRET_KEY_CA
+          description: Stripe secret key for CA region (sk_test_*)
+          required: true 
+        - key: STRIPE_SECRET_KEY_EU
+          description: Stripe secret key for EU region (sk_test_*)
           required: true
         - key: STRIPE_WEBHOOK_SIGNING_SECRET
           description: Stripe Webhook signing secret  (example - whsec_*****).
+          required: true
+        - key: STRIPE_WEBHOOK_SIGNING_SECRET_CA
+          description: Stripe Webhook signing secret  (example - whsec_*****).
+          required: true
+        - key: STRIPE_WEBHOOK_SIGNING_SECRET_EU
+          description: Stripe Webhook signing secret  (example - whsec_*****).
+          required: true
+  - name: paymentCapture
+    applicationType: job
+    endpoint: /capture-m2h
+    properties:
+      schedule: "0 2 * * *" # once in a day at 2 am
+    configuration:
+      standardConfiguration:
+        - key: CTP_PROJECT_KEY
+          description: commercetools project key
+          required: true
+          default: fujifilm-gmsb-global-dev
+        - key: CTP_AUTH_URL
+          description: commercetools Auth URL (example - https://auth.us-central1.gcp.commercetools.com).
+          required: true
+          default: https://auth.us-central1.gcp.commercetools.com
+        - key: CTP_API_URL
+          description: commercetools API URL (example - https://api.us-central1.gcp.commercetools.com).
+          required: true
+        - key: STRIPE_CAPTURE_METHOD
+          description: Stripe capture method (example - manual|automatic).
+          default: manual
+      securedConfiguration:        
+        - key: CTP_CLIENT_SECRET
+          description: commercetools client secret.
+          required: true
+        - key: CTP_CLIENT_ID
+          description: commercetools client ID with manage_payments, manage_orders, view_sessions, view_api_clients, manage_checkout_payment_intents, introspect_oauth_tokens, manage_types and view_types scopes
+          required: true
+        - key: STRIPE_SECRET_KEY
+          description: Stripe secret key for US region (sk_test_*)
+          required: true
+        - key: STRIPE_SECRET_KEY_CA
+          description: Stripe secret key for CA region (sk_test_*)
+          required: true 
+        - key: STRIPE_SECRET_KEY_EU
+          description: Stripe secret key for EU region (sk_test_*)
           required: true
