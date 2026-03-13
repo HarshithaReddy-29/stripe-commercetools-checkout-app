@@ -16,7 +16,12 @@ import {
 } from '../dtos/operations/payment-intents.dto';
 import { StatusResponseSchema, StatusResponseSchemaDTO } from '../dtos/operations/status.dto';
 import { StripePaymentService } from '../services/stripe-payment.service';
-
+import { StripeHeaderAuthHook } from '../libs/fastify/hooks/stripe-header-auth.hook';
+import { getConfig } from "../config/config";
+type StripeRoutesOptions = {
+  paymentService: StripePaymentService;
+  stripeHeaderAuthHook: StripeHeaderAuthHook;
+};
 type OperationRouteOptions = {
   sessionHeaderAuthHook: SessionHeaderAuthenticationHook;
   oauth2AuthHook: Oauth2AuthenticationHook;
@@ -41,6 +46,31 @@ export const operationsRoute = async (fastify: FastifyInstance, opts: FastifyPlu
       reply.code(200).send(config);
     },
   );
+fastify.post('/jobs/capture-payments', async (req, reply) => {
+ 
+  try {
+ 
+    console.log("CAPTURE JOB TRIGGERED");
+ 
+    const paymentService = opts.paymentService;
+ 
+    const result = await paymentService.runDailyCaptureJob();
+ 
+    return reply.send(result);
+ 
+  } catch (err) {
+ 
+  console.error("CAPTURE JOB ERROR:", err);
+ 
+  const error = err as Error;
+ 
+  return reply.status(500).send({
+    message: error. message,
+  });
+ 
+}
+ 
+});
 
   fastify.get<{ Reply: StatusResponseSchemaDTO }>(
     '/status',
@@ -73,6 +103,15 @@ export const operationsRoute = async (fastify: FastifyInstance, opts: FastifyPlu
       reply.code(200).send(result);
     },
   );
+  fastify.get("/stripe-publishable-keys", async () => {
+    const config = getConfig();
+ 
+    return {
+      publishableKeyUS: config.stripePublishableKeyUS,
+      publishableKeyCA: config.stripePublishableKeyCA,
+      publishableKeyEU: config.stripePublishableKeyEU,
+    };
+  });
 
   fastify.post<{ Body: PaymentIntentRequestSchemaDTO; Reply: PaymentIntentResponseSchemaDTO; Params: { id: string } }>(
     '/payment-intents/:id',
@@ -106,4 +145,5 @@ export const operationsRoute = async (fastify: FastifyInstance, opts: FastifyPlu
       return reply.status(200).send(resp);
     },
   );
+  
 };

@@ -1,5 +1,6 @@
 import { PaymentRequestSchemaDTO } from '../../dtos/stripe-payment.dto';
 import {
+  Cart,
   CommercetoolsCartService,
   CommercetoolsOrderService,
   CommercetoolsPaymentMethodService,
@@ -48,3 +49,9 @@ export enum PaymentStatus {
   PENDING = 'Pending',
   INITIAL = 'Initial',
 }
+export interface CreateOrderProps {
+  cart: Cart;
+  subscriptionId?: string;
+  paymentIntentId?: string;
+}
+

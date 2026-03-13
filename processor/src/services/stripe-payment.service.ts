@@ -18,15 +18,16 @@ import {
   ReversePaymentRequest,
   StatusResponse,
 } from './types/operation.type';
-
+import { updateCartById, freezeCart, unfreezeCart, isCartFrozen } from './commerce-tools/cart-client';
 import { SupportedPaymentComponentsSchemaDTO } from '../dtos/operations/payment-componets.dto';
 import { PaymentModificationStatus, PaymentTransactions } from '../dtos/operations/payment-intents.dto';
 import packageJSON from '../../package.json';
-
+import { METADATA_ORDER_ID_FIELD, CT_CUSTOM_FIELD_TAX_CALCULATIONS } from '../constants';
+import { addOrderPayment, createOrderFromCart } from './commerce-tools/order-client';
 import { AbstractPaymentService } from './abstract-payment.service';
 import { config, getConfig } from '../config/config';
 import { appLogger, paymentSDK } from '../payment-sdk';
-import { CaptureMethod, StripeEvent, StripePaymentServiceOptions } from './types/stripe-payment.type';
+import { CaptureMethod, StripeEvent, StripePaymentServiceOptions, CreateOrderProps } from './types/stripe-payment.type';
 import {
   CollectBillingAddressOptions,
   ConfigElementResponseSchemaDTO,
@@ -47,6 +48,7 @@ import { stripeCustomerIdCustomType, stripeCustomerIdFieldName } from '../custom
 import { getCustomFieldUpdateActions } from '../services/commerce-tools/customTypeHelper';
 import { isValidUUID } from '../utils';
 import { updateCustomerById } from '../services/commerce-tools/customerClient';
+import { CartUpdateAction } from '@commercetools/platform-sdk';
 
 export class StripePaymentService extends AbstractPaymentService {
   private stripeEventConverter: StripeEventConverter;
@@ -70,14 +72,23 @@ export class StripePaymentService extends AbstractPaymentService {
    *
    * @returns Promise with mocking object containing configuration information
    */
-  public async config(): Promise<ConfigResponse> {
+  public async config(region: 'US' | 'CA' | 'EU' = 'US'): Promise<ConfigResponse> {
     const config = getConfig();
+
+    const publishableKey =
+      region === 'CA'
+        ? config.stripePublishableKeyCA
+        : region === 'EU'
+          ? config.stripePublishableKeyEU
+          : config.stripePublishableKeyUS;
+
     return {
       environment: config.mockEnvironment,
-      publishableKey: config.stripePublishableKey,
+      publishableKey,
+      //paymentInterface: config.paymentInterface,
+      //merchantReturnUrl: config.merchantReturnUrl,
     };
   }
-
   /**
    * Get status
    *
@@ -199,8 +210,8 @@ export class StripePaymentService extends AbstractPaymentService {
         amount_to_capture: amountToBeCaptured,
         ...(isPartialCapture &&
           config.stripeEnableMultiOperations && {
-            final_capture: false,
-          }),
+          final_capture: false,
+        }),
       });
 
       log.info(`Payment modification completed.`, {
@@ -409,134 +420,178 @@ export class StripePaymentService extends AbstractPaymentService {
    *
    * @return Promise<PaymentResponseSchemaDTO> A Promise that resolves to a PaymentResponseSchemaDTO object containing the client secret and payment reference.
    */
-  public async createPaymentIntentStripe(): Promise<PaymentResponseSchemaDTO> {
-    const config = getConfig();
-    const ctCart = await this.ctCartService.getCart({ id: getCartIdFromContext() });
-    const customer = await this.getCtCustomer(ctCart.customerId!);
-    const shippingAddress = this.getStripeCustomerAddress(ctCart.shippingAddress, customer?.addresses[0]);
-    const amountPlanned = await this.ctCartService.getPaymentAmount({ cart: ctCart });
-    const captureMethodConfig = config.stripeCaptureMethod;
-    const merchantReturnUrl = getMerchantReturnUrlFromContext() || config.merchantReturnUrl;
-    const setupFutureUsage = this.getSetupFutureUsage(ctCart);
-    const stripeCustomerId = customer?.custom?.fields?.[stripeCustomerIdFieldName];
-
-    let paymentIntent!: Stripe.PaymentIntent;
-
+  public async createPaymentIntentStripe(
+    options?: {
+      paymentMethodOptions?: Record<string, Record<string, unknown>>;
+    }
+  ): Promise<PaymentResponseSchemaDTO> {
     try {
-      const idempotencyKey = crypto.randomUUID();
-      paymentIntent = await stripeApi().paymentIntents.create(
-        {
-          ...(stripeCustomerId && {
-            customer: stripeCustomerId,
-            setup_future_usage: setupFutureUsage,
-          }),
-          amount: amountPlanned.centAmount,
-          currency: amountPlanned.currencyCode,
-          automatic_payment_methods: {
-            enabled: true,
-          },
-          capture_method: captureMethodConfig as CaptureMethod,
-          metadata: {
-            cart_id: ctCart.id,
-            ct_project_key: config.projectKey,
-            ...(ctCart.customerId ? { ct_customer_id: ctCart.customerId } : null),
-          },
-          shipping: shippingAddress,
-          payment_method_options: {
-            card: {
-              ...(config.stripeEnableMultiOperations && {
-                request_multicapture: 'if_available',
+      const config = getConfig();
+
+      const ctCart = await this.ctCartService.getCart({
+        id: getCartIdFromContext(),
+      });
+
+      const customer = await this.getCtCustomer(ctCart.customerId!);
+
+      const amountPlanned = {
+        centAmount: ctCart.totalPrice.centAmount,
+        currencyCode: ctCart.totalPrice.currencyCode
+      };
+
+      const shippingAddress = this.getStripeCustomerAddress(
+        ctCart.shippingAddress,
+        (customer as any)?.addresses[0],
+      );
+
+      const stripeCustomerId =
+        (customer as any)?.custom?.fields?.[stripeCustomerIdFieldName];
+
+      const setupFutureUsage = this.getSetupFutureUsage(ctCart);
+
+      const merchantReturnUrl =
+        getMerchantReturnUrlFromContext() || config.merchantReturnUrl;
+      const taxCalculationReferences =
+        ctCart.custom?.fields?.[CT_CUSTOM_FIELD_TAX_CALCULATIONS] as
+        | string[]
+        | undefined;
+
+      const taxCalculationCount = taxCalculationReferences?.length ?? 0;
+      const hasSingleTaxCalculation = taxCalculationCount === 1;
+      const hasTaxCalculations = taxCalculationCount > 0;
+      const paymentMethodOptions: Record<string, Record<string, unknown>> = {
+        card: {
+          //...(config.stripeEnableMultiOperations && {
+          //request_multicapture: 'if_available',
+          //}),
+        },
+        ...(options?.paymentMethodOptions ?? {}),
+      };
+
+      let paymentIntent!: Stripe.PaymentIntent;
+
+      try {
+        paymentIntent = await stripeApi().paymentIntents.create(
+          {
+            ...(stripeCustomerId && {
+              customer: stripeCustomerId,
+              setup_future_usage: setupFutureUsage,
+            }),
+            amount: amountPlanned.centAmount,
+            currency: amountPlanned.currencyCode,
+            automatic_payment_methods: {
+              enabled: true,
+            },
+            capture_method: config.stripeCaptureMethod as CaptureMethod,
+            metadata: {
+              cart_id: ctCart.id,
+              ct_project_key: config.projectKey,
+              ...(ctCart.customerId && {
+                ct_customer_id: ctCart.customerId,
               }),
             },
+            payment_method_options: paymentMethodOptions,
+            ...(hasSingleTaxCalculation && {
+              hooks: {
+                inputs: {
+                  tax: {
+                    calculation: taxCalculationReferences![0],
+                  },
+                },
+              },
+            }),
+
+            // keep shipping optional as in reference
+            /*...(config.stripeCollectBillingAddress === 'auto' && {
+              shipping: shippingAddress,
+            }),*/
           },
-        },
-        {
-          idempotencyKey,
-        },
-      );
-    } catch (e) {
-      throw wrapStripeError(e);
-    }
+          {
+            idempotencyKey: crypto.randomUUID(),
+          },
+        );
+      } catch (e) {
+        throw wrapStripeError(e);
+      }
 
-    log.info(`Stripe PaymentIntent created.`, {
-      ctCartId: ctCart.id,
-      stripePaymentIntentId: paymentIntent.id,
-    });
-
-    const ctPayment = await this.ctPaymentService.createPayment({
-      amountPlanned,
-      checkoutTransactionItemId: getCheckoutTransactionItemIdFromContext(),
-      paymentMethodInfo: {
-        paymentInterface: config.paymentInterface,
-        /*name: { // Currently unused fields
-          en: 'Stripe Payment Connector',
-        },*/
-      },
-      /*paymentStatus: { // Currently unused fields
-        interfaceCode: paymentIntent.id, //This is translated to PSP Status Code on the Order->Payment page
-        interfaceText: paymentIntent.description || '', //This is translated to Description on the Order->Payment page
-      },*/
-      ...(ctCart.customerId && {
-        customer: {
-          typeId: 'customer',
-          id: ctCart.customerId,
+      log.info(`Stripe PaymentIntent created.`, {
+        ctCartId: ctCart.id,
+        stripePaymentIntentId: paymentIntent.id,
+        ...(hasTaxCalculations && {
+          hasTaxCalculations,
+          taxCalculationCount,
+        }),
+        ...(options?.paymentMethodOptions && {
+          frontendPaymentMethodOptions: Object.keys(
+            options.paymentMethodOptions,
+          ),
+        }),
+      });
+      const ctPayment = await this.ctPaymentService.createPayment({
+        amountPlanned,
+        checkoutTransactionItemId: getCheckoutTransactionItemIdFromContext(),
+        paymentMethodInfo: {
+          paymentInterface: config.paymentInterface,
         },
-      }),
-      ...(!ctCart.customerId &&
-        ctCart.anonymousId && {
+        ...(ctCart.customerId && {
+          customer: {
+            typeId: 'customer',
+            id: ctCart.customerId,
+          },
+        }),
+        ...(!ctCart.customerId &&
+          ctCart.anonymousId && {
           anonymousId: ctCart.anonymousId,
         }),
-      transactions: [
-        {
-          type: PaymentTransactions.AUTHORIZATION,
-          amount: amountPlanned,
-          state: this.convertPaymentResultCode(PaymentOutcome.INITIAL as PaymentOutcome),
-          interactionId: paymentIntent.id,
-        },
-      ],
-    });
-
-    await this.ctCartService.addPayment({
-      resource: {
-        id: ctCart.id,
-        version: ctCart.version,
-      },
-      paymentId: ctPayment.id,
-    });
-
-    log.info(`commercetools Payment and initial transaction created.`, {
-      ctCartId: ctCart.id,
-      ctPayment: ctPayment.id,
-      stripePaymentIntentId: paymentIntent.id,
-      merchantReturnUrl: merchantReturnUrl,
-    });
-
-    try {
-      const idempotencyKey = crypto.randomUUID();
-      await stripeApi().paymentIntents.update(
-        paymentIntent.id,
-        {
-          metadata: {
-            ct_payment_id: ctPayment.id,
+        transactions: [
+          {
+            type: PaymentTransactions.AUTHORIZATION,
+            amount: amountPlanned,
+            state: this.convertPaymentResultCode(
+              PaymentOutcome.INITIAL as PaymentOutcome,
+            ),
+            interactionId: paymentIntent.id,
           },
+        ],
+      });
+
+      await this.ctCartService.addPayment({
+        resource: {
+          id: ctCart.id,
+          version: ctCart.version,
         },
-        { idempotencyKey },
-      );
-    } catch (e) {
-      throw wrapStripeError(e);
+        paymentId: ctPayment.id,
+      });
+
+      // ---------------------------------------------
+      // Back-patch Stripe metadata with CT payment id
+      // ---------------------------------------------
+      try {
+        await stripeApi().paymentIntents.update(
+          paymentIntent.id,
+          {
+            metadata: {
+              ct_payment_id: ctPayment.id,
+            },
+          },
+          { idempotencyKey: crypto.randomUUID() },
+        );
+      } catch (e) {
+        throw wrapStripeError(e);
+      }
+
+      return {
+        cartId: ctCart.id,
+        sClientSecret: paymentIntent.client_secret ?? '',
+        paymentReference: ctPayment.id,
+        merchantReturnUrl,
+        ...(config.stripeCollectBillingAddress !== 'auto' && {
+          billingAddress: this.getBillingAddress(ctCart),
+        }),
+      };
+    } catch (error) {
+      throw wrapStripeError(error);
     }
-
-    log.info(`Stripe update Payment id metadata.`);
-
-    return {
-      sClientSecret: paymentIntent.client_secret ?? '',
-      paymentReference: ctPayment.id,
-      merchantReturnUrl: merchantReturnUrl,
-      cartId: ctCart.id,
-      ...(config.stripeCollectBillingAddress !== 'auto' && {
-        billingAddress: this.getBillingAddress(ctCart),
-      }),
-    };
   }
 
   /**
@@ -551,10 +606,12 @@ export class StripePaymentService extends AbstractPaymentService {
       id: getCartIdFromContext(),
     });
 
+
     const ctPayment = await this.ctPaymentService.getPayment({
       id: paymentReference,
     });
     const amountPlanned = ctPayment.amountPlanned;
+    log.info(`log for updatePaymentIntentStripeSuccessful`, ctCart, ctPayment)
 
     log.info(`PaymentIntent confirmed.`, {
       ctCartId: ctCart.id,
@@ -572,6 +629,8 @@ export class StripePaymentService extends AbstractPaymentService {
         state: this.convertPaymentResultCode(PaymentOutcome.AUTHORIZED as PaymentOutcome),
       },
     });
+    log.info(`update payment - updatePaymentIntentStripeSuccessful`, ctPayment)
+
   }
 
   /**
@@ -633,6 +692,72 @@ export class StripePaymentService extends AbstractPaymentService {
         return 'Initial';
     }
   }
+  public async runDailyCaptureJob() {
+    console.log("CAPTURE JOB STARTED");
+    const processed: string[] = [];
+
+    const paymentsToCheck: any[] = []; // populated by caller or scheduled job context
+
+    for (const payment of paymentsToCheck) {
+
+      const paymentIntentId = payment.interfaceId;
+
+      // Skip if not a Stripe payment
+      if (!paymentIntentId) continue;
+
+      const order = await this.ctOrderService.getOrderByPaymentId({
+        paymentId: payment.id
+      });
+
+      if (!order) continue;
+
+      const shippingInfo = order.shippingInfo as any;
+
+      // Only capture Mail-to-Home orders
+      if (shippingInfo?.custom?.fields?.fulfillmentType !== 'm2h') continue;
+
+      const allShipped = order.lineItems.every(
+        (li: any) => li.custom?.fields?.deliveryStatus === 'Shipped'
+      );
+
+      if (!allShipped) continue;
+
+      const region = this.getRegionFromCurrency(order.totalPrice.currencyCode);
+
+      const stripePi = await stripeApi(region)
+        .paymentIntents.retrieve(paymentIntentId);
+
+      if (stripePi.status !== 'requires_capture') continue;
+
+      const captureResponse = await stripeApi(region)
+        .paymentIntents.capture(paymentIntentId);
+
+      await this.ctPaymentService.updatePayment({
+        id: payment.id,
+        transaction: {
+          type: 'Charge',
+          amount: {
+            currencyCode: order.totalPrice.currencyCode,
+            centAmount: order.totalPrice.centAmount
+          },
+          state: 'Success',
+          interactionId: captureResponse.id
+        }
+      });
+
+      processed.push(order.id);
+    }
+
+    return {
+      processed: processed.length,
+      orders: processed
+    };
+  }
+  private getRegionFromCurrency(currency: string): 'US' | 'CA' | 'EU' {
+    if (currency === 'usd') return 'US';
+    if (currency === 'cad') return 'CA';
+    return 'EU';
+  }
 
   /**
    * Processes a Stripe event and updates the corresponding payment in commercetools.
@@ -646,12 +771,50 @@ export class StripePaymentService extends AbstractPaymentService {
    */
   public async processStripeEvent(event: Stripe.Event): Promise<void> {
     log.info('Processing notification', { event: JSON.stringify(event.id) });
+
     try {
       const updateData = this.stripeEventConverter.convert(event);
 
-      //does payment intent event have multicapture?
+      let paymentMethodType = 'card';
+      let paymentMethodName = 'Card';
+      let cardDetails: any = {};
+
+      const stripeObject = event.data.object as any;
+
+      if (stripeObject.payment_method) {
+        const paymentMethod = await stripeApi().paymentMethods.retrieve(
+          stripeObject.payment_method as string
+        );
+
+        if (paymentMethod.type === 'card') {
+          paymentMethodType = 'card';
+          paymentMethodName = paymentMethod.card?.brand ?? 'Card';
+
+          cardDetails = {
+            brand: paymentMethod.card?.brand,
+            last4: paymentMethod.card?.last4,
+            expMonth: paymentMethod.card?.exp_month,
+            expYear: paymentMethod.card?.exp_year,
+          };
+
+          const wallet = paymentMethod.card?.wallet?.type;
+
+          if (wallet === 'apple_pay') {
+            paymentMethodType = 'applepay';
+            paymentMethodName = 'Apple Pay';
+          }
+
+          if (wallet === 'google_pay') {
+            paymentMethodType = 'googlepay';
+            paymentMethodName = 'Google Pay';
+          }
+        }
+      }
+
+      // multicapture logic
       if (event.type.startsWith('payment')) {
         const pi = event.data.object as Stripe.PaymentIntent;
+
         if (
           pi.capture_method === 'manual' &&
           pi.payment_method_options?.card?.request_multicapture === 'if_available' &&
@@ -663,7 +826,6 @@ export class StripePaymentService extends AbstractPaymentService {
           });
 
           if (balanceTransactions.data.length > 1) {
-            //it is multicapture, so we need to update the transactions
             updateData.transactions.forEach((tx) => {
               tx.interactionId = balanceTransactions.data[0].id;
               tx.amount = {
@@ -674,9 +836,38 @@ export class StripePaymentService extends AbstractPaymentService {
           }
         }
       }
+
       for (const tx of updateData.transactions) {
+
+        log.info('processStripeEvent', updateData)
         const updatedPayment = await this.ctPaymentService.updatePayment({
-          ...updateData,
+          id: updateData.id,
+
+          paymentMethod: paymentMethodType,
+
+          paymentMethodInfo: {
+            method: paymentMethodType,
+            name: {
+              'en-US':
+                cardDetails.brand
+                  ? `${cardDetails.brand} ****${cardDetails.last4}`
+                  : paymentMethodName,
+            },
+          },
+
+          customFields: {
+            type: {
+              key: 'payment-details',
+              typeId: 'type',
+            },
+            fields: {
+              cardBrand: cardDetails.brand,
+              last4: cardDetails.last4,
+              expMonth: cardDetails.expMonth,
+              expYear: cardDetails.expYear,
+            },
+          },
+
           transaction: tx,
         });
 
@@ -684,7 +875,7 @@ export class StripePaymentService extends AbstractPaymentService {
           paymentId: updatedPayment.id,
           version: updatedPayment.version,
           pspReference: updateData.pspReference,
-          paymentMethod: updateData.paymentMethod,
+          paymentMethod: paymentMethodType,
           transaction: JSON.stringify(tx),
         });
       }
@@ -890,7 +1081,7 @@ export class StripePaymentService extends AbstractPaymentService {
   public async validateStripeCustomerId(stripeCustomerId: string, ctCustomerId: string): Promise<boolean> {
     try {
       const customer = await stripeApi().customers.retrieve(stripeCustomerId);
-      return Boolean(customer && !customer.deleted && customer.metadata?.ct_customer_id === ctCustomerId);
+      return Boolean(customer && !customer.deleted && (customer as any)?.metadata?.ct_customer_id === ctCustomerId);
     } catch (e) {
       log.warn('Error validating Stripe customer ID', { error: e });
       return false;
@@ -1167,5 +1358,176 @@ export class StripePaymentService extends AbstractPaymentService {
     }
 
     return config.stripeSavedPaymentMethodConfig?.payment_method_save_usage;
+  }
+  public async createOrder({ cart, subscriptionId, paymentIntentId }: CreateOrderProps) {
+    const order = await createOrderFromCart(cart);
+    log.info('Order created successfully', {
+      ctOrderId: order.id,
+      ctCartId: cart.id,
+      stripeSubscriptionId: subscriptionId,
+    });
+    /* If using Stripe Test Clock, wait for 9 seconds to allow clock advancement in test environments.
+      This helps ensure Stripe's test clock events are processed before updating the subscription.
+      Uncomment this line for testing purposes when using Stripe Test Clock.
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      */
+    if (paymentIntentId && paymentIntentId.startsWith('pi_')) {
+      await stripeApi().paymentIntents.update(
+        paymentIntentId,
+        { metadata: { [METADATA_ORDER_ID_FIELD]: order.id } },
+        { idempotencyKey: crypto.randomUUID() },
+      );
+    }
+    /* If using Stripe Test Clock, wait for 9 seconds to allow clock advancement in test environments.
+      This helps ensure Stripe's test clock events are processed before updating the subscription.
+      Uncomment this line for testing purposes when using Stripe Test Clock.
+      await new Promise((resolve) => setTimeout(resolve, 000));
+      */
+
+    if (subscriptionId) {
+      await stripeApi().subscriptions.update(
+        subscriptionId,
+        { metadata: { [METADATA_ORDER_ID_FIELD]: order.id } },
+        { idempotencyKey: crypto.randomUUID() },
+      );
+    }
+  }
+
+  public async addPaymentToOrder(subscriptionPaymentId: string, paymentId: string) {
+    try {
+      const order = await this.ctOrderService.getOrderByPaymentId({ paymentId: subscriptionPaymentId });
+      await addOrderPayment(order, paymentId);
+    } catch (error) {
+      log.error('Error adding payment to order', { error });
+    }
+  }
+
+  public async updateCartAddress(charge: Stripe.Charge, ctCart: Cart): Promise<Cart> {
+    if (!charge) {
+      return ctCart;
+    }
+
+    const addressData = this.validateAndGetStripeAddress(charge, ctCart);
+    if (!addressData) {
+      return ctCart;
+    }
+
+    const { address, addressSource } = addressData;
+    const wasFrozen = isCartFrozen(ctCart);
+
+    const cartToUpdate = await this.unfreezeCartIfNeeded(ctCart, wasFrozen);
+
+    // Stripe has complete address → update the cart
+    const actions: CartUpdateAction[] = [
+      {
+        action: 'setShippingAddress',
+        address: {
+          key: addressSource?.name ?? undefined,
+          country: address.country!,
+          city: address.city ?? undefined,
+          postalCode: address.postal_code ?? undefined,
+          state: address.state ?? undefined,
+          streetName: address.line1 ?? undefined,
+          streetNumber: address.line2 ?? undefined,
+        },
+      },
+    ];
+
+    const updatedCart = await updateCartById(cartToUpdate, actions);
+
+    return await this.refreezeCartIfNeeded(updatedCart, wasFrozen);
+  }
+
+  /**
+   * Validates and extracts a complete Stripe address from charge data.
+   * Returns null if no valid address is found or if cart already has an address.
+   * @param charge - The Stripe charge containing address information
+   * @param ctCart - The commercetools cart to check for existing address
+   * @returns Address data if valid, null otherwise
+   */
+  private validateAndGetStripeAddress(
+    charge: Stripe.Charge,
+    ctCart: Cart,
+  ): { address: Stripe.Address; addressSource: Stripe.Charge.Shipping | Stripe.Charge.BillingDetails | null } | null {
+    const { billing_details, shipping } = charge;
+
+    // Prioritize shipping over billing_details
+    const addressSource = shipping || billing_details;
+    const address = addressSource?.address;
+
+    // Verify if Stripe has a complete and valid address
+    const hasCompleteStripeAddress = !!(
+      address?.country &&
+      address?.state &&
+      address?.city &&
+      address?.postal_code &&
+      address?.line1
+    );
+
+    // If Stripe does not have a complete address, keep the cart's address
+    if (!hasCompleteStripeAddress) {
+      // If the cart already has an address, do not overwrite it with incomplete data
+      if (ctCart.shippingAddress?.country) {
+        return null;
+      }
+      // If the cart also does not have an address, do nothing (avoid using mocks)
+      return null;
+    }
+
+    return { address, addressSource };
+  }
+
+  /**
+   * Unfreezes a cart if it was frozen, allowing address updates.
+   * @param ctCart - The cart to unfreeze if needed
+   * @param wasFrozen - Whether the cart was frozen
+   * @returns The unfrozen cart or original cart if unfreeze fails
+   */
+  private async unfreezeCartIfNeeded(ctCart: Cart, wasFrozen: boolean): Promise<Cart> {
+    if (!wasFrozen) {
+      return ctCart;
+    }
+
+    try {
+      const unfrozenCart = await unfreezeCart(ctCart);
+      log.info(`Cart temporarily unfrozen for address update from successful payment.`, {
+        ctCartId: unfrozenCart.id,
+      });
+      return unfrozenCart;
+    } catch (error) {
+      log.error(`Error unfreezing cart for address update.`, {
+        error,
+        ctCartId: ctCart.id,
+      });
+      // If unfreeze fails, try to update anyway (might work if cart was already unfrozen)
+      return ctCart;
+    }
+  }
+
+  /**
+   * Re-freezes a cart if it was frozen before, restoring its frozen state.
+   * @param updatedCart - The cart that was updated
+   * @param wasFrozen - Whether the cart was frozen before the update
+   * @returns The re-frozen cart or updated cart if refreeze fails
+   */
+  private async refreezeCartIfNeeded(updatedCart: Cart, wasFrozen: boolean): Promise<Cart> {
+    if (!wasFrozen) {
+      return updatedCart;
+    }
+
+    try {
+      const reFrozenCart = await freezeCart(updatedCart);
+      log.info(`Cart re-frozen after address update from successful payment.`, {
+        ctCartId: reFrozenCart.id,
+      });
+      return reFrozenCart;
+    } catch (error) {
+      log.error(`Error re-freezing cart after address update.`, {
+        error,
+        ctCartId: updatedCart.id,
+      });
+      // Return updated cart even if re-freeze fails
+      return updatedCart;
+    }
   }
 }

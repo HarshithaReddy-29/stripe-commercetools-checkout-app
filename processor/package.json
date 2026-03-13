@@ -1,8 +1,12 @@
 {
-  "name": "payment-integration-template",
+  "name": "@gmsb/processor",
   "version": "4.0.1",
   "description": "Payment provider integration template",
   "main": "dist/server.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
   "scripts": {
     "start": "node dist/main.js",
     "start:dev": "node_modules/.bin/nodemon -q dist/main.js",
@@ -31,11 +35,11 @@
     "@fastify/type-provider-typebox": "5.2.0",
     "@sinclair/typebox": "0.34.41",
     "dotenv": "17.2.2",
-    "fastify": "5.6.1",
+    "fastify": "^5.8.2",
     "fastify-plugin": "5.1.0",
     "fastify-raw-body": "^5.0.0",
-    "stripe": "^17.7.0",
-    "fluent-schema": "^1.1.0"
+    "fluent-schema": "^1.1.0",
+    "stripe": "^17.7.0"
   },
   "devDependencies": {
     "@eslint/compat": "^1.4.0",
@@ -63,6 +67,7 @@
     "typescript": "5.9.2"
   },
   "overrides": {
-    "path-to-regexp": "3.3.0"
+    "path-to-regexp": "3.3.0",
+    "lodash": "^4.17.21"
   }
 }

@@ -30,7 +30,11 @@ export const setupFastify = async () => {
     global: false, // add the rawBody to every request. **Default true**
     encoding: false, // set it to false to set rawBody as a Buffer **Default utf8**
     runFirst: true, // get the body before any preParsing hook change/uncompress it. **Default false**
-    routes: ['/stripe/webhooks'], // array of routes, **`global`** will be ignored, wildcard routes not supported
+    routes: [
+    '/stripe/webhooks/us',
+    '/stripe/webhooks/ca',
+    '/stripe/webhooks/eu',
+  ], // array of routes, **`global`** will be ignored, wildcard routes not supported
   });
 
   // Setup error handler

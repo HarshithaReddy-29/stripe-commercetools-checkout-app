@@ -49,7 +49,7 @@ export const customerRoutes = async (fastify: FastifyInstance, opts: FastifyPlug
     async (_, reply) => {
       const resp = await opts.paymentService.getCustomerSession();
       if (!resp) {
-        return reply.status(204).send(resp);
+        return reply.status(204).send(null as any);
       }
       return reply.status(200).send(resp);
     },
@@ -112,70 +112,135 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
   );
 };
 
-export const stripeWebhooksRoutes = async (fastify: FastifyInstance, opts: StripeRoutesOptions) => {
+export const stripeWebhooksRoutes = async (
+  fastify: FastifyInstance,
+  opts: StripeRoutesOptions
+) => {
+  // ---------- US ----------
   fastify.post<{ Body: string }>(
-    '/stripe/webhooks',
+    '/stripe/webhooks/us',
     {
       preHandler: [opts.stripeHeaderAuthHook.authenticate()],
       config: { rawBody: true },
     },
     async (request, reply) => {
-      const signature = request.headers['stripe-signature'] as string;
-
-      let event: Stripe.Event;
-
-      try {
-        event = await stripeApi().webhooks.constructEvent(
-          request.rawBody as string,
-          signature,
-          getConfig().stripeWebhookSigningSecret,
-        );
-      } catch (error) {
-        const err = error as Error;
-        log.error(JSON.stringify(err));
-        return reply.status(400).send(`Webhook Error: ${err.message}`);
-      }
-
-      switch (event.type) {
-        case StripeEvent.PAYMENT_INTENT__SUCCEEDED:
-        case StripeEvent.CHARGE__SUCCEEDED:
-          log.info(`Received: ${event.type} event of ${event.data.object.id}`);
-          await opts.paymentService.processStripeEvent(event);
-          // Stores payment method in commercetools if customer opted-in during checkout
-          await opts.paymentService.storePaymentMethod(event);
-          break;
-        case StripeEvent.PAYMENT_INTENT__CANCELED:
-        case StripeEvent.PAYMENT_INTENT__REQUIRED_ACTION:
-        case StripeEvent.PAYMENT_INTENT__PAYMENT_FAILED:
-          log.info(`Received: ${event.type} event of ${event.data.object.id}`);
-          await opts.paymentService.processStripeEvent(event);
-          break;
-        case StripeEvent.CHARGE__REFUNDED:
-          if (getConfig().stripeEnableMultiOperations) {
-            log.info(`Processing Stripe multirefund event with enhanced tracking: ${event.type}`);
-            await opts.paymentService.processStripeEventRefunded(event);
-          } else {
-            log.info(`Processing Stripe refund event with basic tracking (multi-operations disabled): ${event.type}`);
-            await opts.paymentService.processStripeEvent(event);
-          }
-          break;
-        case StripeEvent.CHARGE__UPDATED:
-          if (getConfig().stripeEnableMultiOperations) {
-            log.info(`Processing Stripe multicapture event: ${event.type}`);
-            await opts.paymentService.processStripeEventMultipleCaptured(event);
-          } else {
-            log.info(`Multi-operations disabled, skipping multicapture: ${event.type}`);
-          }
-          break;
-        default:
-          log.info(`--->>> This Stripe event is not supported: ${event.type}`);
-          break;
-      }
-
-      return reply.status(200).send();
+      log.info("webhooks/us",request,reply)
+      return handleStripeWebhook({
+        request,
+        reply,
+        region: 'US',
+        signingSecret: getConfig().stripeWebhookSigningSecretUS,
+        paymentService: opts.paymentService,
+      });
+    }
+  );
+ 
+  // ---------- CA ----------
+  fastify.post<{ Body: string }>(
+    '/stripe/webhooks/ca',
+    {
+      preHandler: [opts.stripeHeaderAuthHook.authenticate()],
+      config: { rawBody: true },
     },
+    async (request, reply) => {
+      return handleStripeWebhook({
+        request,
+        reply,
+        region: 'CA',
+        signingSecret: getConfig().stripeWebhookSigningSecretCA,
+        paymentService: opts.paymentService,
+      });
+    }
+  );
+ 
+  // ---------- EU ----------
+  fastify.post<{ Body: string }>(
+    '/stripe/webhooks/eu',
+    {
+      preHandler: [opts.stripeHeaderAuthHook.authenticate()],
+      config: { rawBody: true },
+    },
+    async (request, reply) => {
+      return handleStripeWebhook({
+        request,
+        reply,
+        region: 'EU',
+        signingSecret: getConfig().stripeWebhookSigningSecretEU,
+        paymentService: opts.paymentService,
+      });
+    }
   );
 };
+ 
+// ---------------------------------------------------------------------
+// Shared webhook handler (single source of truth)
+// ---------------------------------------------------------------------
+async function handleStripeWebhook({
+  request,
+  reply,
+  region,
+  signingSecret,
+  paymentService,
+}: {
+  request: any;
+  reply: any;
+  region: 'US' | 'CA' | 'EU';
+  signingSecret: string;
+  paymentService: any;
+}) {
+  const signature = request.headers['stripe-signature'] as string;
+  let event: Stripe.Event;
+ 
+  try {
+    event = stripeApi(region).webhooks.constructEvent(
+      request.rawBody as string,
+      signature,
+      signingSecret
+    );
+  } catch (error) {
+    const err = error as Error;
+    log.error({ region, error: err.message });
+    return reply.status(400).send(`Webhook Error: ${err.message}`);
+  }
+ 
+  switch (event.type) {
+    case StripeEvent.PAYMENT_INTENT__SUCCEEDED:
+    case StripeEvent.CHARGE__SUCCEEDED:
+      log.info(`Received [${region}]: ${event.type} - ${event.data.object.id}`);
+      await paymentService.processStripeEvent(event);
+      await paymentService.storePaymentMethod(event);
+      break;
+ 
+    case StripeEvent.PAYMENT_INTENT__CANCELED:
+    case StripeEvent.PAYMENT_INTENT__REQUIRED_ACTION:
+    case StripeEvent.PAYMENT_INTENT__PAYMENT_FAILED:
+      log.info(`Received [${region}]: ${event.type} - ${event.data.object.id}`);
+      await paymentService.processStripeEvent(event);
+      break;
+ 
+    case StripeEvent.CHARGE__REFUNDED:
+      if (getConfig().stripeEnableMultiOperations) {
+        log.info(`Processing multirefund [${region}]`);
+        await paymentService.processStripeEventRefunded(event);
+      } else {
+        await paymentService.processStripeEvent(event);
+      }
+      break;
+ 
+    case StripeEvent.CHARGE__UPDATED:
+      if (getConfig().stripeEnableMultiOperations) {
+        log.info(`Processing multicapture [${region}]`);
+        await paymentService.processStripeEventMultipleCaptured(event);
+      }
+      break;
+ 
+    default:
+      log.info(`Unsupported Stripe event [${region}]: ${event.type}`);
+      break;
+  }
+ 
+  return reply.status(200).send();
+}
 
 export const configElementRoutes = async (
   fastify: FastifyInstance,
