@@ -1,0 +1,794 @@
+import Stripe from 'stripe';
+import fastify from 'fastify';
+import { describe, beforeAll, afterAll, test, expect, jest, afterEach, beforeEach } from '@jest/globals';
+import {
+  CommercetoolsCartService,
+  CommercetoolsOrderService,
+  CommercetoolsPaymentMethodService,
+  CommercetoolsPaymentService,
+  ContextProvider,
+  JWTAuthenticationHook,
+  Oauth2AuthenticationHook,
+  RequestContextData,
+  SessionHeaderAuthenticationHook,
+  SessionHeaderAuthenticationManager,
+} from '@commercetools/connect-payments-sdk';
+import { IncomingHttpHeaders } from 'node:http';
+import {
+  configElementRoutes,
+  customerRoutes,
+  paymentRoutes,
+  stripeWebhooksRoutes,
+} from '../../src/routes/stripe-payment.route';
+import { StripePaymentService } from '../../src/services/stripe-payment.service';
+import * as CartClient from '../../src/services/commerce-tools/cart-client';
+import { StripePaymentServiceOptions } from '../../src/services/types/stripe-payment.type';
+import {
+  CommercetoolsRecurringPaymentJobService,
+} from '@commercetools/connect-payments-sdk';
+import { paymentSDK } from '../../src/payment-sdk';
+import { mockGetCartResult } from '../utils/mock-cart-data';
+import {
+  mockEvent__paymentIntent_processing,
+  mockEvent__paymentIntent_paymentFailed,
+  mockEvent__paymentIntent_succeeded_captureMethodManual,
+  mockEvent__charge_refund_captured,
+  mockEvent__paymentIntent_canceled,
+  mockRoute__payments_succeed,
+  mockRoute__get_config_element_succeed,
+  mockEvent__charge_capture_succeeded_notCaptured,
+  mockEvent__paymentIntent_requiresAction,
+  mockRoute__well_know__succeed,
+  mockRoute__customer_session_succeed,
+} from '../utils/mock-routes-data';
+import * as Config from '../../src/config/config';
+import * as Logger from '../../src/libs/logger/index';
+import { StripeHeaderAuthHook } from '../../src/libs/fastify/hooks/stripe-header-auth.hook';
+import { appLogger } from '../../src/payment-sdk';
+
+jest.mock('stripe', () => ({
+  __esModule: true,
+  default: jest.fn().mockImplementation(() => ({
+    webhooks: {
+      constructEvent: jest.fn<() => Stripe.Event>().mockReturnValue(mockEvent__charge_capture_succeeded_notCaptured),
+    },
+  })),
+}));
+jest.mock('../../src/services/stripe-payment.service');
+jest.mock('../../src/libs/logger/index');
+
+interface FlexibleConfig {
+  [key: string]: string | boolean; // Adjust the type according to your config values
+}
+function setupMockConfig(keysAndValues: Record<string, string | boolean>) {
+  const mockConfig: FlexibleConfig = {};
+  Object.keys(keysAndValues).forEach((key) => {
+    const value = keysAndValues[key];
+    // Convert 'true'/'false' strings to actual booleans for stripeEnableMultiOperations
+    if (key === 'stripeEnableMultiOperations' && typeof value === 'string') {
+      mockConfig[key] = value === 'true';
+    } else {
+      mockConfig[key] = value;
+    }
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  jest.spyOn(Config, 'getConfig').mockReturnValue(mockConfig as any);
+}
+
+describe('Stripe Payment APIs', () => {
+  const fastifyApp = fastify({ logger: false });
+  const token = 'token';
+  const jwtToken = 'jwtToken';
+  const sessionId = 'session-id';
+
+  const spyAuthenticateJWT = jest
+    .spyOn(JWTAuthenticationHook.prototype, 'authenticate')
+    .mockImplementationOnce(() => async (request: { headers: IncomingHttpHeaders }) => {
+      expect(request.headers['authorization']).toContain(`Bearer ${jwtToken}`);
+    });
+
+  const spyAuthenticateOauth2 = jest
+    .spyOn(Oauth2AuthenticationHook.prototype, 'authenticate')
+    .mockImplementationOnce(() => async (request: { headers: IncomingHttpHeaders }) => {
+      expect(request.headers['authorization']).toContain(`Bearer ${token}`);
+    });
+
+  const spyAuthenticateSession = jest
+    .spyOn(SessionHeaderAuthenticationHook.prototype, 'authenticate')
+    .mockImplementation(() => async (request: { headers: IncomingHttpHeaders }) => {
+      expect(request.headers['x-session-id']).toContain('session-id');
+    });
+
+  const spyStripeHeaderAuthHook = jest
+    .spyOn(SessionHeaderAuthenticationHook.prototype, 'authenticate')
+    .mockImplementation(() => async () => {
+      expect('stripe-signature').toEqual('stripe-signature');
+    });
+
+  const spiedSessionHeaderAuthenticationHook = new SessionHeaderAuthenticationHook({
+    logger: appLogger,
+    authenticationManager: jest.fn() as unknown as SessionHeaderAuthenticationManager,
+    contextProvider: jest.fn() as unknown as ContextProvider<RequestContextData>,
+  });
+
+  const spiedPaymentService = new StripePaymentService({
+    ctCartService: jest.fn() as unknown as CommercetoolsCartService,
+    ctPaymentService: jest.fn() as unknown as CommercetoolsPaymentService,
+    ctOrderService: jest.fn() as unknown as CommercetoolsOrderService,
+    ctPaymentMethodService: jest.fn() as unknown as CommercetoolsPaymentMethodService,
+    ctRecurringPaymentJobService: jest.fn() as unknown as CommercetoolsRecurringPaymentJobService, // ✅ ADD THIS
+  });
+
+  const spiedStripeHeaderAuthHook = new StripeHeaderAuthHook();
+
+  const originalEnv = process.env;
+
+  beforeAll(async () => {
+    await fastifyApp.register(stripeWebhooksRoutes, {
+      stripeHeaderAuthHook: spiedStripeHeaderAuthHook,
+      paymentService: spiedPaymentService,
+    });
+
+    await fastifyApp.register(paymentRoutes, {
+      prefix: '/',
+      sessionHeaderAuthHook: spiedSessionHeaderAuthenticationHook,
+      paymentService: spiedPaymentService,
+    });
+
+    await fastifyApp.register(configElementRoutes, {
+      prefix: '/',
+      sessionHeaderAuthHook: spiedSessionHeaderAuthenticationHook,
+      paymentService: spiedPaymentService,
+    });
+
+    await fastifyApp.register(customerRoutes, {
+      prefix: '/',
+      sessionHeaderAuthHook: spiedSessionHeaderAuthenticationHook,
+      paymentService: spiedPaymentService,
+    });
+  });
+
+  beforeEach(() => {
+    jest.setTimeout(10000);
+    jest.resetAllMocks();
+    process.env = { ...originalEnv };
+    process.env.STRIPE_WEBHOOK_SIGNING_SECRET = 'STRIPE_WEBHOOK_SIGNING_SECRET';
+  });
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    spyAuthenticateJWT.mockClear();
+    spyAuthenticateOauth2.mockClear();
+    spyAuthenticateSession.mockClear();
+    spyStripeHeaderAuthHook.mockClear();
+    await fastifyApp.ready();
+    process.env = originalEnv;
+  });
+
+  afterAll(async () => {
+    await fastifyApp.close();
+  });
+
+  describe('POST /stripe/webhooks', () => {
+    test('it should handle a payment_intent.succeeded event gracefully.', async () => {
+      setupMockConfig({
+        stripeSecretKey: 'stripeSecretKey',
+        stripeWebhookSigningSecret: 'stripeWebhookSigningSecret',
+        authUrl: 'https://auth.europe-west1.gcp.commercetools.com',
+      });
+
+      // Set mocked functions to Stripe and spyOn to set the result expected
+      Stripe.prototype.webhooks = { constructEvent: jest.fn() } as unknown as Stripe.Webhooks;
+      jest
+        .spyOn(Stripe.prototype.webhooks, 'constructEvent')
+        .mockReturnValue(mockEvent__paymentIntent_succeeded_captureMethodManual);
+
+      jest.spyOn(StripePaymentService.prototype, 'processStripeEvent').mockReturnValue(Promise.resolve());
+      //When
+      const response = await fastifyApp.inject({
+        method: 'POST',
+        url: `/stripe/webhooks`,
+        headers: {
+          'stripe-signature': 't=123123123,v1=gk2j34gk2j34g2k3j4',
+        },
+      });
+
+      //Then
+      expect(response.statusCode).toEqual(200);
+      expect(spiedPaymentService.processStripeEvent).toHaveBeenCalled();
+      expect(spiedPaymentService.processStripeEvent).toHaveBeenCalledTimes(1);
+    });
+
+    test('it should handle a charge.refunded event gracefully with enhanced multirefund tracking.', async () => {
+      setupMockConfig({
+        stripeSecretKey: 'stripeSecretKey',
+        stripeWebhookSigningSecret: 'stripeWebhookSigningSecret',
+        authUrl: 'https://auth.europe-west1.gcp.commercetools.com',
+        stripeEnableMultiOperations: 'true',
+      });
+
+      // Set mocked functions to Stripe and spyOn to set the result expected
+      Stripe.prototype.webhooks = { constructEvent: jest.fn() } as unknown as Stripe.Webhooks;
+      jest.spyOn(Stripe.prototype.webhooks, 'constructEvent').mockReturnValue(mockEvent__charge_refund_captured);
+      jest.spyOn(StripePaymentService.prototype, 'processStripeEventRefunded').mockReturnValue(Promise.resolve());
+
+      //When
+      const response = await fastifyApp.inject({
+        method: 'POST',
+        url: `/stripe/webhooks`,
+        headers: {
+          'stripe-signature': 't=123123123,v1=gk2j34gk2j34g2k3j4',
+        },
+      });
+
+      //Then
+      expect(response.statusCode).toEqual(200);
+      expect(spiedPaymentService.processStripeEventRefunded).toHaveBeenCalled();
+    });
+
+    test('it should handle a charge.refunded event with basic tracking when multi-operations disabled.', async () => {
+      setupMockConfig({
+        stripeSecretKey: 'stripeSecretKey',
+        stripeWebhookSigningSecret: 'stripeWebhookSigningSecret',
+        authUrl: 'https://auth.europe-west1.gcp.commercetools.com',
+        stripeEnableMultiOperations: 'false',
+      });
+
+      // Set mocked functions to Stripe and spyOn to set the result expected
+      Stripe.prototype.webhooks = { constructEvent: jest.fn() } as unknown as Stripe.Webhooks;
+      jest.spyOn(Stripe.prototype.webhooks, 'constructEvent').mockReturnValue(mockEvent__charge_refund_captured);
+      jest.spyOn(StripePaymentService.prototype, 'processStripeEvent').mockReturnValue(Promise.resolve());
+
+      //When
+      const response = await fastifyApp.inject({
+        method: 'POST',
+        url: `/stripe/webhooks`,
+        headers: {
+          'stripe-signature': 't=123123123,v1=gk2j34gk2j34g2k3j4',
+        },
+      });
+
+      //Then
+      expect(response.statusCode).toEqual(200);
+      expect(spiedPaymentService.processStripeEvent).toHaveBeenCalled();
+      expect(spiedPaymentService.processStripeEventRefunded).not.toHaveBeenCalled();
+    });
+
+    test('it should handle a charge.updated event and route to multicapture handler when enabled.', async () => {
+      setupMockConfig({
+        stripeSecretKey: 'stripeSecretKey',
+        stripeWebhookSigningSecret: 'stripeWebhookSigningSecret',
+        authUrl: 'https://auth.europe-west1.gcp.commercetools.com',
+        stripeEnableMultiOperations: 'true',
+      });
+
+      const mockChargeUpdatedEvent: Stripe.Event = {
+        id: 'evt_charge_updated',
+        object: 'event',
+        type: 'charge.updated',
+        created: Date.now(),
+        api_version: '2024-04-10',
+        livemode: false,
+        pending_webhooks: 0,
+        request: null,
+        data: {
+          object: {
+            id: 'ch_123',
+            object: 'charge',
+            amount_captured: 50000,
+            captured: true,
+            currency: 'usd',
+            balance_transaction: 'txn_123',
+            payment_intent: 'pi_123',
+          } as Stripe.Charge,
+          previous_attributes: {
+            amount_captured: 30000,
+          } as Partial<Stripe.Charge>,
+        },
+      } as Stripe.Event;
+
+      // Set mocked functions to Stripe and spyOn to set the result expected
+      Stripe.prototype.webhooks = { constructEvent: jest.fn() } as unknown as Stripe.Webhooks;
+      jest.spyOn(Stripe.prototype.webhooks, 'constructEvent').mockReturnValue(mockChargeUpdatedEvent);
+      jest
+        .spyOn(StripePaymentService.prototype, 'processStripeEventMultipleCaptured')
+        .mockReturnValue(Promise.resolve());
+
+      //When
+      const response = await fastifyApp.inject({
+        method: 'POST',
+        url: `/stripe/webhooks`,
+        headers: {
+          'stripe-signature': 't=123123123,v1=gk2j34gk2j34g2k3j4',
+        },
+      });
+
+      //Then
+      expect(response.statusCode).toEqual(200);
+      expect(spiedPaymentService.processStripeEventMultipleCaptured).toHaveBeenCalled();
+    });
+
+    test('it should skip charge.updated event when multi-operations disabled.', async () => {
+      setupMockConfig({
+        stripeSecretKey: 'stripeSecretKey',
+        stripeWebhookSigningSecret: 'stripeWebhookSigningSecret',
+        authUrl: 'https://auth.europe-west1.gcp.commercetools.com',
+        stripeEnableMultiOperations: 'false',
+      });
+
+      const mockChargeUpdatedEvent: Stripe.Event = {
+        id: 'evt_charge_updated',
+        object: 'event',
+        type: 'charge.updated',
+        created: Date.now(),
+        api_version: '2024-04-10',
+        livemode: false,
+        pending_webhooks: 0,
+        request: null,
+        data: {
+          object: {
+            id: 'ch_123',
+            object: 'charge',
+            amount_captured: 50000,
+            captured: true,
+            currency: 'usd',
+            balance_transaction: 'txn_123',
+            payment_intent: 'pi_123',
+          } as Stripe.Charge,
+          previous_attributes: {
+            amount_captured: 30000,
+          } as Partial<Stripe.Charge>,
+        },
+      } as Stripe.Event;
+
+      // Set mocked functions to Stripe and spyOn to set the result expected
+      Stripe.prototype.webhooks = { constructEvent: jest.fn() } as unknown as Stripe.Webhooks;
+      jest.spyOn(Stripe.prototype.webhooks, 'constructEvent').mockReturnValue(mockChargeUpdatedEvent);
+      jest
+        .spyOn(StripePaymentService.prototype, 'processStripeEventMultipleCaptured')
+        .mockReturnValue(Promise.resolve());
+
+      //When
+      const response = await fastifyApp.inject({
+        method: 'POST',
+        url: `/stripe/webhooks`,
+        headers: {
+          'stripe-signature': 't=123123123,v1=gk2j34gk2j34g2k3j4',
+        },
+      });
+
+      //Then
+      expect(response.statusCode).toEqual(200);
+      expect(spiedPaymentService.processStripeEventMultipleCaptured).not.toHaveBeenCalled();
+    });
+
+    test('it should handle a payment_intent.canceled event gracefully.', async () => {
+      setupMockConfig({
+        stripeSecretKey: 'stripeSecretKey',
+        stripeWebhookSigningSecret: 'stripeWebhookSigningSecret',
+        authUrl: 'https://auth.europe-west1.gcp.commercetools.com',
+      });
+
+      // Set mocked functions to Stripe and spyOn to set the result expected
+      Stripe.prototype.webhooks = { constructEvent: jest.fn() } as unknown as Stripe.Webhooks;
+      jest.spyOn(Stripe.prototype.webhooks, 'constructEvent').mockReturnValue(mockEvent__paymentIntent_canceled);
+      jest.spyOn(StripePaymentService.prototype, 'processStripeEvent').mockReturnValue(Promise.resolve());
+
+      //When
+      const response = await fastifyApp.inject({
+        method: 'POST',
+        url: `/stripe/webhooks`,
+        headers: {
+          'stripe-signature': 't=123123123,v1=gk2j34gk2j34g2k3j4',
+        },
+      });
+
+      //Then
+      expect(response.statusCode).toEqual(200);
+      expect(spiedPaymentService.processStripeEvent).toHaveBeenCalled();
+    });
+
+    test('it should handle a payment_intent.payment_failed event gracefully.', async () => {
+      setupMockConfig({
+        stripeSecretKey: 'stripeSecretKey',
+        authUrl: 'https://auth.europe-west1.gcp.commercetools.com',
+      });
+
+      // Set mocked functions to Stripe and spyOn to set the result expected
+      Stripe.prototype.webhooks = { constructEvent: jest.fn() } as unknown as Stripe.Webhooks;
+      jest.spyOn(Stripe.prototype.webhooks, 'constructEvent').mockReturnValue(mockEvent__paymentIntent_paymentFailed);
+
+      //When
+      const response = await fastifyApp.inject({
+        method: 'POST',
+        url: `/stripe/webhooks`,
+        headers: {
+          'stripe-signature': 't=123123123,v1=gk2j34gk2j34g2k3j4',
+        },
+      });
+
+      //Then
+      expect(response.statusCode).toEqual(200);
+      expect(Logger.log.info).toHaveBeenCalled();
+    });
+
+    test('it should handle a payment_intent.requires_action event gracefully.', async () => {
+      setupMockConfig({
+        stripeSecretKey: 'stripeSecretKey',
+        authUrl: 'https://auth.europe-west1.gcp.commercetools.com',
+      });
+
+      // Set mocked functions to Stripe and spyOn to set the result expected
+      Stripe.prototype.webhooks = { constructEvent: jest.fn() } as unknown as Stripe.Webhooks;
+      jest.spyOn(Stripe.prototype.webhooks, 'constructEvent').mockReturnValue(mockEvent__paymentIntent_requiresAction);
+
+      //When
+      const response = await fastifyApp.inject({
+        method: 'POST',
+        url: `/stripe/webhooks`,
+        headers: {
+          'stripe-signature': 't=123123123,v1=gk2j34gk2j34g2k3j4',
+        },
+      });
+
+      //Then
+      expect(response.statusCode).toEqual(200);
+      expect(Logger.log.info).toHaveBeenCalled();
+    });
+
+    test('it should return a 400 status error when the request body is not a valid Stripe event.', async () => {
+      setupMockConfig({
+        stripeSecretKey: 'stripeSecretKey',
+        stripeWebhookSigningSecret: 'stripeWebhookSigningSecret',
+        authUrl: 'https://auth.europe-west1.gcp.commercetools.com',
+      });
+
+      // Set mocked functions to Stripe and spyOn to set the result expected
+      Stripe.prototype.webhooks = { constructEvent: jest.fn() } as unknown as Stripe.Webhooks;
+      jest.spyOn(Stripe.prototype.webhooks, 'constructEvent').mockImplementation(() => {
+        throw new Error('Error creating Stripe Event from webhook payload');
+      });
+
+      //When
+      const response = await fastifyApp.inject({
+        method: 'POST',
+        url: `/stripe/webhooks`,
+        headers: {
+          'stripe-signature': 't=123123123,v1=gk2j34gk2j34g2k3j4',
+        },
+      });
+
+      //Then
+      expect(response.statusCode).toEqual(400);
+      expect(Logger.log.error).toHaveBeenCalled();
+    });
+
+    test('it should print a log when the Stripe event received is not supported.', async () => {
+      setupMockConfig({
+        stripeSecretKey: 'stripeSecretKey',
+        stripeWebhookSigningSecret: 'stripeWebhookSigningSecret',
+        authUrl: 'https://auth.europe-west1.gcp.commercetools.com',
+      });
+
+      // Set mocked functions to Stripe and spyOn to set the result expected
+      Stripe.prototype.webhooks = { constructEvent: jest.fn() } as unknown as Stripe.Webhooks;
+      jest.spyOn(Stripe.prototype.webhooks, 'constructEvent').mockReturnValue(mockEvent__paymentIntent_processing);
+
+      //When
+      const response = await fastifyApp.inject({
+        method: 'POST',
+        url: `/stripe/webhooks`,
+        headers: {
+          'stripe-signature': 't=123123123,v1=gk2j34gk2j34g2k3j4',
+        },
+      });
+
+      //Then
+      expect(response.statusCode).toEqual(200);
+      expect(Logger.log.info).toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /payment', () => {
+    test('should call /payment and return valid information', async () => {
+      //Given
+      jest.spyOn(spiedPaymentService, 'createPaymentIntentStripe').mockResolvedValue(mockRoute__payments_succeed);
+
+      //When
+      const responseGetConfig = await fastifyApp.inject({
+        method: 'GET',
+        url: `/payments`,
+        headers: {
+          'x-session-id': sessionId,
+          'content-type': 'application/json',
+        },
+      });
+
+      //Then
+      expect(responseGetConfig.statusCode).toEqual(200);
+      expect(responseGetConfig.json()).toEqual(mockRoute__payments_succeed);
+      expect(spiedPaymentService.createPaymentIntentStripe).toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /confirmPayments/:id', () => {
+    test('should call /confirmPayments/:id and return valid information', async () => {
+      //Given
+      jest.spyOn(spiedPaymentService, 'updatePaymentIntentStripeSuccessful').mockResolvedValue();
+
+      //When
+      const responseGetConfig = await fastifyApp.inject({
+        method: 'POST',
+        url: `/confirmPayments/id`,
+        headers: {
+          'x-session-id': sessionId,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ paymentIntent: 'paymentId' }),
+      });
+
+      //Then
+      expect(responseGetConfig.statusCode).toEqual(200);
+      expect(responseGetConfig.body).toEqual(JSON.stringify({ outcome: 'approved' }));
+      expect(spiedPaymentService.updatePaymentIntentStripeSuccessful).toHaveBeenCalled();
+    });
+
+    test('should call /confirmPayments/:id and return error information', async () => {
+      //Given
+      jest.spyOn(spiedPaymentService, 'updatePaymentIntentStripeSuccessful').mockImplementation(() => {
+        throw new Error('error');
+      });
+
+      //When
+      const responseGetConfig = await fastifyApp.inject({
+        method: 'POST',
+        url: `/confirmPayments/id`,
+        headers: {
+          'x-session-id': sessionId,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ paymentIntent: 'paymentId' }),
+      });
+
+      //Then
+      expect(responseGetConfig.statusCode).toEqual(400);
+      expect(responseGetConfig.body).toEqual(JSON.stringify({ outcome: 'rejected', error: JSON.stringify({}) }));
+      expect(spiedPaymentService.updatePaymentIntentStripeSuccessful).toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /config-element', () => {
+    test('should call /config-element', async () => {
+      //Given
+      jest.spyOn(spiedPaymentService, 'initializeCartPayment').mockResolvedValue(mockRoute__get_config_element_succeed);
+
+      //When
+      const responseGetConfig = await fastifyApp.inject({
+        method: 'GET',
+        url: `/config-element/payment`,
+        headers: {
+          'x-session-id': sessionId,
+          'content-type': 'application/json',
+        },
+      });
+
+      //Then
+      expect(responseGetConfig.statusCode).toEqual(200);
+      expect(responseGetConfig.json()).toEqual(mockRoute__get_config_element_succeed);
+      expect(spiedPaymentService.initializeCartPayment).toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /applePayConfig', () => {
+    test('should call /applePayConfig', async () => {
+      //Given
+      jest.spyOn(spiedPaymentService, 'applePayConfig').mockReturnValue(mockRoute__well_know__succeed);
+
+      //When
+      const responseGetConfig = await fastifyApp.inject({
+        method: 'GET',
+        url: `/applePayConfig`,
+      });
+
+      //Then
+      expect(responseGetConfig.statusCode).toEqual(200);
+      expect(responseGetConfig.body).toEqual(mockRoute__well_know__succeed);
+      expect(spiedPaymentService.applePayConfig).toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /customer/session', () => {
+    test('should call /customer/session and return valid information', async () => {
+      //Given
+      jest.spyOn(spiedPaymentService, 'getCustomerSession').mockResolvedValue(mockRoute__customer_session_succeed);
+
+      //When
+      const responseGetConfig = await fastifyApp.inject({
+        method: 'GET',
+        url: `/customer/session`,
+        headers: {
+          'x-session-id': sessionId,
+          'content-type': 'application/json',
+        },
+      });
+
+      //Then
+      expect(responseGetConfig.statusCode).toEqual(200);
+      expect(responseGetConfig.json()).toEqual(mockRoute__customer_session_succeed);
+      expect(spiedPaymentService.getCustomerSession).toHaveBeenCalled();
+    });
+
+    test('should call /customer/session and return undefined', async () => {
+      //Given
+      jest.spyOn(spiedPaymentService, 'getCustomerSession').mockResolvedValue(undefined);
+
+      //When
+      const responseGetConfig = await fastifyApp.inject({
+        method: 'GET',
+        url: `/customer/session`,
+        headers: {
+          'x-session-id': sessionId,
+          'content-type': 'application/json',
+        },
+      });
+
+      //Then
+      expect(responseGetConfig.statusCode).toEqual(204);
+      expect(spiedPaymentService.getCustomerSession).toHaveBeenCalled();
+    });
+  });
+
+  describe('updateCartAddress method', () => {
+    const opts: StripePaymentServiceOptions = {
+      ctCartService: paymentSDK.ctCartService,
+      ctPaymentService: paymentSDK.ctPaymentService,
+      ctOrderService: paymentSDK.ctOrderService,
+
+      // ✅ ADD THESE (mocked)
+      ctPaymentMethodService: {} as any,
+      ctRecurringPaymentJobService: {} as any,
+    };
+    test('should update cart address using shipping details when available', async () => {
+      const mockCart = mockGetCartResult();
+      const stripePaymentService: StripePaymentService = new StripePaymentService(opts);
+      // Mock shipping details in the Stripe charge
+      const mockCharge = {
+        billing_details: {
+          name: 'John Doe Billing',
+          address: {
+            country: 'US',
+            city: 'NYC',
+            postal_code: '10001',
+            state: 'NY',
+            line1: '123 Billing St',
+          },
+        },
+        shipping: {
+          name: 'John Doe Shipping',
+          address: {
+            country: 'GB',
+            city: 'London',
+            postal_code: 'SW1A 1AA',
+            state: 'Greater London',
+            line1: '10 Downing Street',
+          },
+        },
+      } as Stripe.Charge;
+
+      // Mock the expected cart update actions
+      const expectedActions = [
+        {
+          action: 'setShippingAddress' as const,
+          address: {
+            key: 'John Doe Shipping',
+            country: 'GB',
+            city: 'London',
+            postalCode: 'SW1A 1AA',
+            state: 'Greater London',
+            streetName: '10 Downing Street',
+          },
+        },
+      ];
+
+      // Mock updateCartById function
+      const updateCartByIdMock = jest
+        .spyOn(CartClient, 'updateCartById')
+        .mockResolvedValue({ ...mockCart, shippingAddress: expectedActions[0].address });
+
+      // Call the method
+      const result = await stripePaymentService.updateCartAddress(mockCharge, mockCart);
+
+      // Verify cart update was called with correct actions
+      expect(updateCartByIdMock).toHaveBeenCalledWith(mockCart, expectedActions);
+
+      // Verify returned cart
+      expect(result).toEqual({ ...mockCart, shippingAddress: expectedActions[0].address });
+    });
+
+    test('should use billing details when shipping is not available', async () => {
+      const opts: StripePaymentServiceOptions = {
+        ctCartService: paymentSDK.ctCartService,
+        ctPaymentService: paymentSDK.ctPaymentService,
+        ctOrderService: paymentSDK.ctOrderService,
+
+        // ✅ ADD THESE (mocked)
+        ctPaymentMethodService: {} as any,
+        ctRecurringPaymentJobService: {} as any,
+      };
+      const mockCart = mockGetCartResult();
+      const stripePaymentService: StripePaymentService = new StripePaymentService(opts);
+      // Mock charge with only billing details (no shipping)
+      const mockCharge = {
+        billing_details: {
+          name: 'Jane Smith',
+          address: {
+            country: 'US',
+            city: 'Chicago',
+            postal_code: '60601',
+            state: 'IL',
+            line1: '456 Billing Ave',
+          },
+        },
+        // No shipping property
+      } as Stripe.Charge;
+
+      // Mock the expected cart update actions using billing details
+      const expectedActions = [
+        {
+          action: 'setShippingAddress' as const,
+          address: {
+            key: 'Jane Smith',
+            country: 'US',
+            city: 'Chicago',
+            postalCode: '60601',
+            state: 'IL',
+            streetName: '456 Billing Ave',
+          },
+        },
+      ];
+
+      // Mock updateCartById function
+      const updateCartByIdMock = jest
+        .spyOn(CartClient, 'updateCartById')
+        .mockResolvedValue({ ...mockCart, shippingAddress: expectedActions[0].address });
+
+      // Call the method
+      const result = await stripePaymentService.updateCartAddress(mockCharge, mockCart);
+
+      // Verify cart update was called with correct actions
+      expect(updateCartByIdMock).toHaveBeenCalledWith(mockCart, expectedActions);
+
+      // Verify returned cart
+      expect(result).toEqual({ ...mockCart, shippingAddress: expectedActions[0].address });
+    });
+
+    test('should return cart unchanged when address details are missing', async () => {
+      const stripePaymentService: StripePaymentService = new StripePaymentService(opts);
+      const mockCart = mockGetCartResult();
+
+      // Mock charge with minimal details (incomplete address)
+      const mockCharge = {
+        billing_details: {
+          // No name
+          address: {
+            // No details - missing required fields: country, state, city, postal_code, line1
+          },
+        },
+        // No shipping property
+      } as Stripe.Charge;
+
+      // Mock updateCartById function
+      const updateCartByIdMock = jest.spyOn(CartClient, 'updateCartById');
+
+      // Call the method
+      const result = await stripePaymentService.updateCartAddress(mockCharge, mockCart);
+
+      // Verify updateCartById was NOT called (incomplete address should not trigger an update)
+      expect(updateCartByIdMock).not.toHaveBeenCalled();
+
+      // Verify returned cart is the original cart unchanged
+      expect(result).toEqual(mockCart);
+    });
+  });
+});
