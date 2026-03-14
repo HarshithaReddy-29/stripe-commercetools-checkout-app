@@ -7,7 +7,10 @@
 "scripts": {
   "prebuild": "npm --prefix ../processor install && npm --prefix ../processor run build",
   "build": "rimraf ./build && tsc",
-  "start": "node build/index.js"
+  "start": "node build/index.js",
+    "lint": "eslint . --ext .ts",
+    "prettier": "prettier --write '**/*.{js,ts}'",
+    "test": "jest --config jest.config.cjs"
 },
   "author": "",
   "license": "MIT",
