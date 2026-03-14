@@ -10,5 +10,5 @@ build/
 .env
 public/
 .connect/
-dist/
-**/dist/
+
+
