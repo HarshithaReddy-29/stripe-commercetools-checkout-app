@@ -1,0 +1,47 @@
+mode: ContinuousDelivery
+
+assembly-versioning-scheme: MajorMinorPatch
+assembly-file-versioning-scheme: MajorMinorPatch
+tag-prefix: v
+
+branches:
+  main:
+    mode: ContinuousDelivery
+    label: ''
+    increment: Minor
+    prevent-increment:
+      when-current-commit-tagged: true
+    source-branches: ['development']
+    is-release-branch: true
+    regex: ^main$
+
+  development:
+    mode: ContinuousDelivery
+    label: ''                
+    increment: Minor
+    track-merge-target: true
+    prevent-increment:
+      when-current-commit-tagged: true
+    source-branches: ['main']
+    is-release-branch: false
+    regex: ^develop(ment)?$
+
+  feature:
+    mode: ContinuousDelivery
+    label: ''
+    increment: None
+    source-branches: ['development']
+    is-release-branch: false
+    regex: ^features?[/-](?<BranchName>.+)
+  hotfix:
+    mode: ContinuousDelivery
+    label: ''                
+    increment: Patch         
+    prevent-increment:
+      when-current-commit-tagged: true
+    source-branches: ['main'] 
+    is-release-branch: false  
+    regex: ^hotfix(es)?[/-].+ 
+
+ignore:
+  sha: []

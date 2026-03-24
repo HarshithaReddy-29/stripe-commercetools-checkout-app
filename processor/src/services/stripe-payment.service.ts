@@ -716,9 +716,7 @@ export class StripePaymentService extends AbstractPaymentService {
       // Only capture Mail-to-Home orders
       if (shippingInfo?.custom?.fields?.fulfillmentType !== 'm2h') continue;
 
-      const allShipped = order.lineItems.every(
-        (li: any) => li.custom?.fields?.deliveryStatus === 'Shipped'
-      );
+      const allShipped = order.lineItems.every((li: any) => li.custom?.fields?.deliveryStatus === 'Shipped');
 
       if (!allShipped) continue;
 
@@ -1124,7 +1122,9 @@ export class StripePaymentService extends AbstractPaymentService {
       We have plans to support recurring payments and saved payment methods in the next quarters.
       Not sure if you can wait until that so your implementation would be aligned with ours.
     */
+    const existingFields = customer?.custom?.fields || {};
     const fields: Record<string, string> = {
+      ...existingFields,
       [stripeCustomerIdFieldName]: stripeCustomerId,
     };
     const { id, version, custom } = customer;

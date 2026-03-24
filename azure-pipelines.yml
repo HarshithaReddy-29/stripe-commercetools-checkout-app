@@ -1,0 +1,99 @@
+# Root Azure Pipeline - Calls templates from Voyager/gmsb-common-ado-templates
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: Voyager/gmsb-common-ado-templates
+      ref: feature/fix-ct-connect-redeploy-order-service
+
+pool: ADOCloudOnPremiseROC
+
+trigger:
+  branches:
+    include:
+      - feature/*
+      - development
+      - main
+      - hotfix/*
+         
+variables:
+  - group: gmsb-global-common-vars
+  #- template: variables/connect/ct-connect-common-vars.yml@templates
+
+  - name: Source_Branch_Ref
+    value: $[replace(variables['Build.SourceBranch'], 'refs/heads/', '')]
+
+  - name: GITHUB_REPO_URL_PLAIN
+    value: 'https://github.com/$(GITHUB_ORG_NAME)/gmsb-ct-connect-stripe.git'
+
+  - name: GITHUB_REPO_URL_WITH_PAT
+    value: 'https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/$(GITHUB_ORG_NAME)/gmsb-ct-connect-stripe.git'
+
+  - name: IS_STRIPE_REPO
+    value: 'True'
+
+
+  # ===============================================
+  # STRIPE APPLICATIONS — DEFAULT MAPPING
+  # ===============================================
+  - name: DEV_DEPLOYMENT_KEY
+    value: 'gmsb-ct-connect-stripe-dev'
+  - name: DEV_CONNECTOR_ID
+    value: 'c8b5e8d0-072c-4a37-bc61-d42b5316a214'
+
+  - name: STAGE_DEPLOYMENT_KEY
+    value: 'gmsb-ct-connect-stripe-stage'
+  - name: STAGE_CONNECTOR_ID
+    value: '8fcd319b-04ed-4f4b-b474-96d8b4f71622'
+
+  - name: PREVIEW_DEPLOYMENT_KEY
+    value: 'gmsb-ct-connect-stripe-preview'
+  - name: PREVIEW_CONNECTOR_ID
+    value: '78545e68-b028-4fb7-8f52-82d05f427f89'
+
+
+  # ===============================================
+  # OVERRIDE IF REPO = AKENEO
+  # ===============================================
+  # - name: DEV_DEPLOYMENT_KEY
+  #   value: 'gmsb-ct-connect-akeneo-dev'
+  # - name: DEV_CONNECTOR_ID
+  #   value: 'c07241b5-c604-4347-ad0a-634321f0392b'
+
+  # - name: STAGE_DEPLOYMENT_KEY
+  #   value: 'gmsb-ct-connect-akeneo-stage'
+  # - name: STAGE_CONNECTOR_ID
+  #   value: '27f8915d-8a8b-4e7d-99ce-e11ba023201f'
+
+  # - name: PREVIEW_DEPLOYMENT_KEY
+  #   value: 'gmsb-ct-connect-akeneo-preview'
+  # - name: PREVIEW_CONNECTOR_ID
+  #   value: '739ee2ec-5436-4bb1-8f7b-f27e8c1dc222'
+
+
+# ===============================================
+# CALL MAIN CICD TEMPLATE
+# ===============================================
+
+stages:
+  - template: pipelines/connect/ct-connect-cicd.yml@templates
+    parameters:
+      sourceBranchRef: $(Source_Branch_Ref)
+      githubRepoUrlPlain: $(GITHUB_REPO_URL_PLAIN)
+      githubRepoUrlWithPat: $(GITHUB_REPO_URL_WITH_PAT)
+      buildId: $(Build.BuildId)
+      buildSourceBranch: $(Build.SourceBranch)
+      buildReason: $(Build.Reason)
+      buildRequestedForEmail: $(Build.RequestedForEmail)
+      buildRequestedFor: $(Build.RequestedFor)
+
+      #PASS MAPPED VALUES INTO THE CICD TEMPLATE
+      devDeploymentKey: $(DEV_DEPLOYMENT_KEY)
+      devConnectorId:  $(DEV_CONNECTOR_ID)
+      stageDeploymentKey: $(STAGE_DEPLOYMENT_KEY)
+      stageConnectorId:  $(STAGE_CONNECTOR_ID)
+      isStripe: ${{ variables.IS_STRIPE_REPO }}
+      prevDeploymentKey: $(PREVIEW_DEPLOYMENT_KEY)
+      prevConnectorId:  $(PREVIEW_CONNECTOR_ID)
+

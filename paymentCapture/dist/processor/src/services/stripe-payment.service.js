@@ -954,7 +954,9 @@ class StripePaymentService extends abstract_payment_service_1.AbstractPaymentSer
           We have plans to support recurring payments and saved payment methods in the next quarters.
           Not sure if you can wait until that so your implementation would be aligned with ours.
         */
+        const existingFields = customer?.custom?.fields || {};
         const fields = {
+            ...existingFields,
             [custom_types_1.stripeCustomerIdFieldName]: stripeCustomerId,
         };
         const { id, version, custom } = customer;

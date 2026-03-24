@@ -1,23 +1,18 @@
-import { FakeSdk } from "../fake-sdk";
-import {
-  ComponentOptions,
-  PaymentComponent,
-  PaymentComponentState,
-  PaymentMethod,
-  PaymentResult,
-} from "../payment-enabler/payment-enabler";
+//import { FakeSdk } from '../fake-sdk';
+import { ComponentOptions, PaymentComponent, PaymentComponentState, PaymentMethod, PaymentResult } from '../payment-enabler/payment-enabler';
 import { BaseOptions } from "../payment-enabler/payment-enabler-mock";
+import {Stripe} from '@stripe/stripe-js'
+//import {Stripe, StripePaymentElement, StripeExpressCheckoutElement} from "@stripe/stripe-js";
 
 export type ElementOptions = {
   paymentMethod: PaymentMethod;
 };
-
 /**
  * Base Web Component
  */
 export abstract class BaseComponent implements PaymentComponent {
   protected paymentMethod: ElementOptions["paymentMethod"];
-  protected sdk: FakeSdk;
+  protected sdk: Stripe;
   protected processorUrl: BaseOptions["processorUrl"];
   protected sessionId: BaseOptions["sessionId"];
   protected environment: BaseOptions["environment"];

@@ -47,7 +47,7 @@ export class CustomTestMethod extends BaseComponent {
 
   async submit() {
     // here we would call the SDK to submit the payment
-    this.sdk.init({ environment: this.environment });
+    //this.sdk.init({ environment: this.environment });
     try {
       const requestData: PaymentRequestSchemaDTO = {
         paymentMethod: {

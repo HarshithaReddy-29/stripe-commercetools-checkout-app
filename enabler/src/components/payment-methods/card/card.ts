@@ -67,7 +67,7 @@ export class Card extends BaseComponent {
     storePaymentDetails?: boolean;
   }) {
     // here we would call the SDK to submit the payment
-    this.sdk.init({ environment: this.environment });
+    //this.sdk.init({ environment: this.environment });
     const isFormValid = validateAllFields();
     if (!isFormValid) {
       return;

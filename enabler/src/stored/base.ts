@@ -1,4 +1,4 @@
-import { FakeSdk } from "../fake-sdk";
+//import { FakeSdk } from "../fake-sdk";
 import {
   StoredComponentOptions,
   StoredComponent,
@@ -11,10 +11,12 @@ import {
   BaseOptions,
   StoredPaymentMethodsConfig,
 } from "../payment-enabler/payment-enabler-mock";
+import { Stripe } from "@stripe/stripe-js";
 
 /**
  * Base Web Component
  */
+
 export abstract class MockBaseStoredComponentBuilder
   implements StoredComponentBuilder
 {
@@ -40,7 +42,7 @@ export abstract class MockBaseStoredComponentBuilder
 
 export abstract class DefaultMockStoredComponent implements StoredComponent {
   protected paymentMethod: PaymentMethod;
-  protected sdk: FakeSdk;
+  protected sdk: Stripe;
   protected componentOptions: StoredComponentOptions;
   protected sessionId: string;
   protected processorUrl: string;

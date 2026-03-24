@@ -91,7 +91,7 @@ export class StoredCardComponent extends DefaultMockStoredComponent {
 
   async submit(): Promise<void> {
     // here we would call the SDK to submit the payment
-    this.sdk.init({ environment: "test" });
+    //this.sdk.init({ environment: "test" });
     const isFormValid = validateAllFieldsStored(this.cvvFieldId);
     if (!isFormValid) {
       return;

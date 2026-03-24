@@ -21,4 +21,15 @@ export class FakeSdk {
   init(opts: any) {
     console.log('FakeSdk init', opts);
   }
+  async confirmPayment(params: any) {
+    console.log('FakeSdk confirmPayment', params);
+ 
+    return {
+      error: null,
+      paymentIntent: {
+        id: `pi_fake_${Date.now()}`,
+        status: "succeeded"
+      }
+    };
+  }
 }
