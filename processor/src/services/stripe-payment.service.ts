@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable prettier/prettier */
 import Stripe from 'stripe';
 import {
   Address,
@@ -696,6 +698,7 @@ export class StripePaymentService extends AbstractPaymentService {
     console.log("CAPTURE JOB STARTED");
     const processed: string[] = [];
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const paymentsToCheck: any[] = []; // populated by caller or scheduled job context
 
     for (const payment of paymentsToCheck) {

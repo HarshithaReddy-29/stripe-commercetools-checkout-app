@@ -1,25 +1,20 @@
 {
   "name": "payment-capture-job",
   "version": "1.0.0",
-  "description": "Stripe Payment capture job",  
   "main": "dist/index.js",
   "private": true,
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
-    "test": "echo \"No tests\" && exit 0"
+    "start": "node dist/index.js"
   },
-  "author": "",
-  "license": "MIT",
   "dependencies": {
-    "@gmsb/processor": "file:../processor"
+    "@commercetools/platform-sdk": "^8.0.0",
+    "@commercetools/ts-client": "^3.1.2",
+    "dotenv": "^16.4.5",
+    "stripe": "^14.25.0"
   },
-"devDependencies": {
+  "devDependencies": {
     "typescript": "^5.0.0",
-    "@jest/globals": "30.2.0",
-    "@types/jest": "30.0.0",
-    "eslint-plugin-jest": "20.0.1",
-    "jest": "30.2.0",
-    "ts-jest": "29.4.4"
+    "@types/node": "^20.0.0"
   }
 }
