@@ -119,14 +119,17 @@ deployAs:
     properties:
       schedule: "0 2 * * *"
     configuration:
-    standardConfiguration:
+      standardConfiguration:
       - key: CTP_PROJECT_KEY
         required: true
+        default: fujifilm-gmsb-global-dev
       - key: CTP_AUTH_URL
         required: true
+        default: https://auth.us-central1.gcp.commercetools.com
       - key: CTP_API_URL
         required: true
-    securedConfiguration:
+        default: https://api.us-central1.gcp.commercetools.com
+      securedConfiguration:
       - key: CTP_CLIENT_ID
         required: true
       - key: CTP_CLIENT_SECRET
