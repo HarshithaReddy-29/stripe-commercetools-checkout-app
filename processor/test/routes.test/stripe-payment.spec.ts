@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import Stripe from 'stripe';
 import fastify from 'fastify';
 import { describe, beforeAll, afterAll, test, expect, jest, afterEach, beforeEach } from '@jest/globals';
@@ -23,9 +24,7 @@ import {
 import { StripePaymentService } from '../../src/services/stripe-payment.service';
 import * as CartClient from '../../src/services/commerce-tools/cart-client';
 import { StripePaymentServiceOptions } from '../../src/services/types/stripe-payment.type';
-import {
-  CommercetoolsRecurringPaymentJobService,
-} from '@commercetools/connect-payments-sdk';
+import { CommercetoolsRecurringPaymentJobService } from '@commercetools/connect-payments-sdk';
 import { paymentSDK } from '../../src/payment-sdk';
 import { mockGetCartResult } from '../utils/mock-cart-data';
 import {
@@ -71,8 +70,6 @@ function setupMockConfig(keysAndValues: Record<string, string | boolean>) {
       mockConfig[key] = value;
     }
   });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   jest.spyOn(Config, 'getConfig').mockReturnValue(mockConfig as any);
 }
 

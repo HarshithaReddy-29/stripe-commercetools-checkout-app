@@ -118,36 +118,9 @@ deployAs:
     applicationType: job
     endpoint: /capture-m2h
     properties:
-      schedule: "0 2 * * *" # once in a day at 2 am
+      schedule: "0 2 * * *"
     configuration:
       standardConfiguration:
-        - key: CTP_PROJECT_KEY
-          description: commercetools project key
-          required: true
-          default: fujifilm-gmsb-global-dev
-        - key: CTP_AUTH_URL
-          description: commercetools Auth URL (example - https://auth.us-central1.gcp.commercetools.com).
-          required: true
-          default: https://auth.us-central1.gcp.commercetools.com
-        - key: CTP_API_URL
-          description: commercetools API URL (example - https://api.us-central1.gcp.commercetools.com).
-          required: true
-        - key: STRIPE_CAPTURE_METHOD
-          description: Stripe capture method (example - manual|automatic).
-          default: manual
-      securedConfiguration:        
-        - key: CTP_CLIENT_SECRET
-          description: commercetools client secret.
-          required: true
-        - key: CTP_CLIENT_ID
-          description: commercetools client ID with manage_payments, manage_orders, view_sessions, view_api_clients, manage_checkout_payment_intents, introspect_oauth_tokens, manage_types and view_types scopes
-          required: true
-        - key: STRIPE_SECRET_KEY
-          description: Stripe secret key for US region (sk_test_*)
-          required: true
-        - key: STRIPE_SECRET_KEY_CA
-          description: Stripe secret key for CA region (sk_test_*)
-          required: true 
-        - key: STRIPE_SECRET_KEY_EU
-          description: Stripe secret key for EU region (sk_test_*)
-          required: true
+      - key: DUMMY
+        description: dummy config
+        required: false

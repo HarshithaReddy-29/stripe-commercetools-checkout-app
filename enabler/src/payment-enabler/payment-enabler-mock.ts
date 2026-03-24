@@ -17,7 +17,6 @@ import {
   StripePaymentElementOptions,
   TermsOption
 } from "@stripe/stripe-js";
-//import { StripePaymentElement } from "@stripe/stripe-js";
 import { SampleExpressBuilder } from "../express/sample";
 import { FakeSdk } from "../fake-sdk.ts";
 import { createSession } from "../utils/session-client.ts";
