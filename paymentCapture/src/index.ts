@@ -1,12 +1,14 @@
 import { runCaptureJob } from './services/capture.service';
-
-async function run() {
-  console.log('Running payment capture job');
-  const result = await runCaptureJob();
-  console.log('Capture job completed:', result);
-}
-
-run().catch((err) => {
-  console.error('Payment capture job failed', err);
-  process.exit(1);
-});
+ 
+(async () => {
+  try {
+    console.log("CAPTURE JOB STARTED");
+    const result = await runCaptureJob();   
+    console.log("CAPTURE JOB RESULT:", JSON.stringify(result, null, 2));
+    console.log("CAPTURE JOB COMPLETED");
+    process.exit(0);
+  } catch (error) {
+    console.error("CAPTURE JOB FAILED", error);
+    process. exit(1);
+  }
+})();
