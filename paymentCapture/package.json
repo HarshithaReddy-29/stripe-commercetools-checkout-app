@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "npm run build && node dist/index.js"
   },
   "dependencies": {
     "@commercetools/platform-sdk": "^8.0.0",
