@@ -116,7 +116,7 @@ deployAs:
           required: true
   - name: paymentCapture
     applicationType: job
-    endpoint: /
+    endpoint: /payment-capture
     properties:
       schedule: "0 2 * * *"
     configuration:
