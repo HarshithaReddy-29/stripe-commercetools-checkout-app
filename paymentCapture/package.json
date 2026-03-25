@@ -4,12 +4,13 @@
   "main": "dist/index.js",
   "private": true,
   "scripts": {
+    "gcp-build": "tsc",                      
     "build": "tsc",
-    "start": "npm run build && node dist/index.js"
+    "start": "node dist/index.js"         
   },
   "dependencies": {
     "@commercetools/platform-sdk": "^8.0.0",
-    "@commercetools/ts-client": "^3.1.2",
+    "@commercetools/ts-client": "^4.0.0",  
     "dotenv": "^16.4.5",
     "stripe": "^14.25.0"
   },
