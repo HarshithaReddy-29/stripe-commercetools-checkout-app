@@ -10,34 +10,9 @@ import {
   type ClientResponse,
 } from '@commercetools/platform-sdk';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
-});
-
-function getRegionFromCurrency(currency: string): 'US' | 'CA' | 'EU' {
-  const normalized = currency.toUpperCase();
-  if (normalized === 'USD') return 'US';
-  if (normalized === 'CAD') return 'CA';
-  return 'EU';
-}
-
-function getStripeClient(region: 'US' | 'CA' | 'EU'): Stripe {
-  const key =
-    region === 'CA'
-      ? process.env.STRIPE_SECRET_KEY_CA
-      : region === 'EU'
-        ? process.env.STRIPE_SECRET_KEY_EU
-        : process.env.STRIPE_SECRET_KEY;
-
-  if (!key) {
-    throw new Error(`Missing Stripe secret key for region ${region}`);
-  }
-
-  return new Stripe(key, {
-    apiVersion: '2023-10-16',
-  });
-}
-
+/**
+ * Get commercetools API client
+ */
 function getApiRoot() {
   const authHost = process.env.CTP_AUTH_URL!;
   const apiHost = process.env.CTP_API_URL!;
@@ -66,17 +41,47 @@ function getApiRoot() {
   return createApiBuilderFromCtpClient(ctpClient).withProjectKey({ projectKey });
 }
 
+/**
+ * Resolve Stripe region
+ */
+function getRegionFromCurrency(currency: string): 'US' | 'CA' | 'EU' {
+  const normalized = currency.toUpperCase();
+  if (normalized === 'USD') return 'US';
+  if (normalized === 'CAD') return 'CA';
+  return 'EU';
+}
+
+/**
+ * Get Stripe client per region
+ */
+function getStripeClient(region: 'US' | 'CA' | 'EU'): Stripe {
+  const key =
+    region === 'CA'
+      ? process.env.STRIPE_SECRET_KEY_CA
+      : region === 'EU'
+      ? process.env.STRIPE_SECRET_KEY_EU
+      : process.env.STRIPE_SECRET_KEY;
+
+  if (!key) {
+    throw new Error(`Missing Stripe secret key for region ${region}`);
+  }
+
+  return new Stripe(key, {
+    apiVersion: '2023-10-16',
+  });
+}
+
+/**
+ * MAIN JOB
+ */
 export async function runCaptureJob() {
   console.log('CAPTURE JOB STARTED');
 
   const apiRoot = getApiRoot();
   const processed: string[] = [];
 
+  // Fetch payments
   const paymentsResponse: ClientResponse<{
-    limit: number;
-    offset: number;
-    count: number;
-    total?: number;
     results: Payment[];
   }> = await apiRoot
     .payments()
@@ -95,11 +100,18 @@ export async function runCaptureJob() {
       const paymentIntentId = payment.interfaceId;
       if (!paymentIntentId) continue;
 
+      //Skip already captured payments (IMPORTANT)
+      const alreadyCharged = payment.transactions?.some(
+        (tx: any) => tx.type === 'Charge' && tx.state === 'Success'
+      );
+
+      if (alreadyCharged) {
+        console.log(`Skipping ${payment.id} — already captured`);
+        continue;
+      }
+
+      // Get order
       const ordersResponse: ClientResponse<{
-        limit: number;
-        offset: number;
-        count: number;
-        total?: number;
         results: Order[];
       }> = await apiRoot
         .orders()
@@ -114,22 +126,70 @@ export async function runCaptureJob() {
       const order = ordersResponse.body.results[0];
       if (!order) continue;
 
+      // Only M2H orders
       const shippingInfo: any = order.shippingInfo;
       if (shippingInfo?.custom?.fields?.fulfillmentType !== 'm2h') continue;
 
-      const allShipped = order.lineItems.every(
-        (li: any) => li?.custom?.fields?.deliveryStatus === 'Shipped'
-      );
-      if (!allShipped) continue;
+      // Eligibility: all items must be Shipped OR Cancelled
+      const isEligible = order.lineItems.every((li: any) => {
+        const status = li?.custom?.fields?.deliveryStatus;
+        return status === 'Shipped' || status === 'Cancelled';
+      });
 
+      if (!isEligible) continue;
+
+      // Calculate capture amount (ONLY shipped items)
+      let captureCentAmount = 0;
+
+      for (const li of order.lineItems) {
+        const status = li?.custom?.fields?.deliveryStatus;
+
+        if (status === 'Shipped') {
+          captureCentAmount += li.totalPrice.centAmount;
+        }
+      }
+
+      // Add shipping cost
+      if (order.shippingInfo?.price?.centAmount) {
+        captureCentAmount += order.shippingInfo.price.centAmount;
+      }
+
+      // Nothing to capture
+      if (captureCentAmount <= 0) {
+        console.log(`Skipping order ${order.id} — nothing to capture`);
+        continue;
+      }
+
+      // Stripe region
       const region = getRegionFromCurrency(order.totalPrice.currencyCode);
       const stripeClient = getStripeClient(region);
 
+      // Get PaymentIntent
       const paymentIntent = await stripeClient.paymentIntents.retrieve(paymentIntentId);
+
       if (paymentIntent.status !== 'requires_capture') continue;
 
-      const captureResponse = await stripeClient.paymentIntents.capture(paymentIntentId);
+      // Ensure we don't exceed capturable amount
+      const capturable = paymentIntent.amount_capturable ?? 0;
 
+      if (captureCentAmount > capturable) {
+        console.warn(
+          `Adjusting capture amount. Requested: ${captureCentAmount}, Capturable: ${capturable}`
+        );
+        captureCentAmount = capturable;
+      }
+
+      if (captureCentAmount <= 0) continue;
+
+      // Capture payment
+      const captureResponse = await stripeClient.paymentIntents.capture(
+        paymentIntentId,
+        {
+          amount_to_capture: captureCentAmount,
+        }
+      );
+
+      // Update commercetools payment
       await apiRoot
         .payments()
         .withId({ ID: payment.id })
@@ -143,7 +203,7 @@ export async function runCaptureJob() {
                   type: 'Charge',
                   amount: {
                     currencyCode: order.totalPrice.currencyCode,
-                    centAmount: order.totalPrice.centAmount,
+                    centAmount: captureCentAmount,
                   },
                   state: 'Success',
                   interactionId: captureResponse.id,
